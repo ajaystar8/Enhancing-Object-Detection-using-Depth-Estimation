@@ -16,10 +16,13 @@ config = [
     ["B", 2],
     (256, 3, 2),
     ["B", 8],
+    # first route from the end of the previous block
     (512, 3, 2),
     ["B", 8],
+    # second route from the end of the previous block
     (1024, 3, 2),
-    ["B", 4],  # To this point is Darknet-53
+    ["B", 4],
+    # To this point is Darknet-53
     (512, 1, 1),
     (1024, 3, 1),
     "S",
