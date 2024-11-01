@@ -30,3 +30,5 @@ replay_pid*
 out
 *.bkp
 data
+
+resources/PASCAL_VOC/
