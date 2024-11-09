@@ -62,7 +62,7 @@ class ResidualBlock(nn.Module):
             self.layers.append(
                 nn.Sequential(
                     CNNBlock(channels, channels // 2, kernel_size=1),
-                    CNNBlock(channels // 2, channels, kernel_size=3, padding=1)
+                    CNNBlock(channels // 2, channels,  kernel_size=3, padding=1)
                 )
             )
         self.use_residual = use_residual

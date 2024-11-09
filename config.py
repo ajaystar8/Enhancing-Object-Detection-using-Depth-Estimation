@@ -25,11 +25,22 @@ CHECKPOINT_FILE = "checkpoint.pth.tar"
 IMG_DIR = DATASET + "/images/"
 LABEL_DIR = DATASET + "/labels/"
 
+'''
+In YoLov3, there are three prediction scale, where each predication scale has three anchor boxes. This means that
+when the entire image is divided into cells, each cell of the image has three anchor boxes. For example, the first 
+prediction scale has the image divided into grid cells of dimensions 13x13, and each cell of this prediction scale has 
+three anchor boxes.
+Each tuple consists of the height and width of the respective anchor box. 
+Each list grouping consists of the dimensions (height and width) of the anchor boxes for that scale prediction level. 
+
+Note: The dimensions have been scaled to be relative to the image. 
+'''
 ANCHORS = [
+    # Largest anchor boxes -> used for prediction on the coarsest grid, where predicting larger anchor boxes is easier.
     [(0.28, 0.22), (0.38, 0.48), (0.9, 0.78)],
     [(0.07, 0.15), (0.15, 0.11), (0.14, 0.29)],
     [(0.02, 0.03), (0.04, 0.07), (0.08, 0.06)],
-]  # Note these have been rescaled to be between [0, 1]
+]
 
 scale = 1.1
 train_transforms = A.Compose(
