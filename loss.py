@@ -29,7 +29,7 @@ class YoloLoss(nn.Module):
 
         # NO OBJECT LOSS
         no_object_loss = self.bce(
-            predictions[..., 0:1][noobj], target[..., 0][obj])
+            predictions[..., 0:1][noobj], target[..., 0:1][noobj])
 
         # OBJECT LOSS
 

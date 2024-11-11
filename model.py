@@ -118,7 +118,6 @@ class YOLOv3(nn.Module):
             elif isinstance(layer, nn.Upsample):
                 x = torch.cat([x, route_connections[-1]], dim=1)
                 route_connections.pop()
-
         return outputs
 
     def _create_conv_layers(self):

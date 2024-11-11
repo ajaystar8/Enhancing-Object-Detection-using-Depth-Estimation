@@ -19,7 +19,7 @@ MAP_IOU_THRESH = 0.5
 NMS_IOU_THRESH = 0.45
 S = [IMAGE_SIZE // 32, IMAGE_SIZE // 16, IMAGE_SIZE // 8]
 PIN_MEMORY = True
-LOAD_MODEL = True
+LOAD_MODEL = False
 SAVE_MODEL = True
 CHECKPOINT_FILE = "checkpoint.pth.tar"
 IMG_DIR = DATASET + "/images/"
@@ -53,7 +53,8 @@ train_transforms = A.Compose(
             value=0
         ),
         A.RandomCrop(width=IMAGE_SIZE, height=IMAGE_SIZE),
-        A.ColorJitter(brightness=0.6, contrast=0.6, saturation=0.6, hue=0.6, p=0.4),
+        A.ColorJitter(brightness=0.6, contrast=0.6,
+                      saturation=0.6, hue=0.6, p=0.4),
         A.OneOf(
             [
                 A.ShiftScaleRotate(
@@ -72,7 +73,8 @@ train_transforms = A.Compose(
         A.Normalize(mean=[0, 0, 0], std=[1, 1, 1], max_pixel_value=255, ),
         ToTensorV2(),
     ],
-    bbox_params=A.BboxParams(format="yolo", min_visibility=0.4, label_fields=[], ),
+    bbox_params=A.BboxParams(
+        format="yolo", min_visibility=0.4, label_fields=[], ),
 )
 test_transforms = A.Compose(
     [
@@ -83,7 +85,8 @@ test_transforms = A.Compose(
         A.Normalize(mean=[0, 0, 0], std=[1, 1, 1], max_pixel_value=255, ),
         ToTensorV2(),
     ],
-    bbox_params=A.BboxParams(format="yolo", min_visibility=0.4, label_fields=[]),
+    bbox_params=A.BboxParams(
+        format="yolo", min_visibility=0.4, label_fields=[]),
 )
 
 PASCAL_CLASSES = [
