@@ -31,3 +31,5 @@ out
 *.bkp
 data
 __*
+*.pth
+*.tar
