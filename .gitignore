@@ -33,3 +33,5 @@ data
 __*
 *.pth
 *.tar
+weights
+NYUD_Utils/depth

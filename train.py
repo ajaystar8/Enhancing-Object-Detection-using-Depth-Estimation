@@ -3,6 +3,7 @@ import torch
 import torch.optim as optim
 import os
 
+from load_weights import load_darknet_weights
 from model import YOLOv3
 from tqdm import tqdm
 from utils import (
@@ -32,9 +33,9 @@ def train_fn(train_loader, model, optimizer, loss_fn, scaled_anchors):
 
         out = model(x)
         loss = (
-            loss_fn(out[0], y0, scaled_anchors[0]) +
-            loss_fn(out[1], y1, scaled_anchors[1]) +
-            loss_fn(out[2], y2, scaled_anchors[2])
+                loss_fn(out[0], y0, scaled_anchors[0]) +
+                loss_fn(out[1], y1, scaled_anchors[1]) +
+                loss_fn(out[2], y2, scaled_anchors[2])
         )
 
         losses.append(loss.item())
@@ -48,6 +49,8 @@ def train_fn(train_loader, model, optimizer, loss_fn, scaled_anchors):
 
 def main():
     model = YOLOv3(num_classes=config.NUM_CLASSES).to(config.DEVICE)
+    # TODO: Fix loading of pre-trained weights
+    #load_darknet_weights(model, "./weights/yolov3.weights")
     optimizer = optim.Adam(
         model.parameters(), lr=config.LEARNING_RATE, weight_decay=config.WEIGHT_DECAY
     )
@@ -61,11 +64,11 @@ def main():
         load_checkpoint(
             config.CHECKPOINT_FILE, model, optimizer, config.LEARNING_RATE
         )
-        
-    #Scale anchors to each prediction scale
+
+    # Scale anchors to each prediction scale
     scaled_anchors = (
-        torch.tensor(config.ANCHORS)
-        * torch.tensor(config.S).unsqueeze(1).unsqueeze(1).repeat(1, 3, 2)
+            torch.tensor(config.ANCHORS)
+            * torch.tensor(config.S).unsqueeze(1).unsqueeze(1).repeat(1, 3, 2)
     ).to(config.DEVICE)
 
     for epoch in range(config.NUM_EPOCHS):

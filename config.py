@@ -60,7 +60,7 @@ train_transforms = A.Compose(
                 A.ShiftScaleRotate(
                     rotate_limit=20, p=0.5, border_mode=cv2.BORDER_CONSTANT
                 ),
-                A.IAAAffine(shear=15, p=0.5, mode="constant"),
+                # A.IAAAffine(shear=15, p=0.5, mode="constant"),
             ],
             p=1.0,
         ),
@@ -80,7 +80,7 @@ test_transforms = A.Compose(
     [
         A.LongestMaxSize(max_size=IMAGE_SIZE),
         A.PadIfNeeded(
-            min_height=IMAGE_SIZE, min_width=IMAGE_SIZE, border_mode=cv2.BORDER_CONSTANT
+            min_height=IMAGE_SIZE, min_width=IMAGE_SIZE, border_mode=cv2.BORDER_CONSTANT, value=0
         ),
         A.Normalize(mean=[0, 0, 0], std=[1, 1, 1], max_pixel_value=255, ),
         ToTensorV2(),
