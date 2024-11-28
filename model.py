@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+from torchsummary import summary
 
 """
 Tuple: (filters, kernel_size, stride) 
@@ -43,7 +44,7 @@ class CNNBlock(nn.Module):
     def __init__(self, in_channels, out_channels, bn_act=True, **kwargs):
         super(CNNBlock, self).__init__()
         self.conv = nn.Conv2d(in_channels, out_channels, bias=not bn_act, **kwargs)
-        self.bn = nn.BatchNorm2d(out_channels)
+        self.bn = nn.BatchNorm2d(out_channels) if bn_act else None
         self.leaky = nn.LeakyReLU(0.1)
         self.use_bn_act = bn_act
 
@@ -118,6 +119,7 @@ class YOLOv3(nn.Module):
             elif isinstance(layer, nn.Upsample):
                 x = torch.cat([x, route_connections[-1]], dim=1)
                 route_connections.pop()
+
         return outputs
 
     def _create_conv_layers(self):
@@ -155,14 +157,15 @@ class YOLOv3(nn.Module):
 
 
 def test():
-    num_classes = 20
+    num_classes = 80
     model = YOLOv3(num_classes=num_classes)
-    img_size = 416
+    img_size = 608
     x = torch.randn((2, 3, img_size, img_size))
     out = model(x)
     assert out[0].shape == (2, 3, img_size // 32, img_size // 32, 5 + num_classes)
     assert out[1].shape == (2, 3, img_size // 16, img_size // 16, 5 + num_classes)
     assert out[2].shape == (2, 3, img_size // 8, img_size // 8, 5 + num_classes)
+    summary(model, (3, 608, 608))
     print("Success!")
 
 

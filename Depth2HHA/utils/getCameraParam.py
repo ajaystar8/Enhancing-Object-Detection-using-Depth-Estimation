@@ -5,6 +5,8 @@ import numpy as np
 getCameraParam: get the camera matrix
 colOrZ: color or depth
 '''
+
+
 def getCameraParam(colorOrZ='color'):
     if colorOrZ == 'color':
         fx_rgb = 5.1885790117450188e+02

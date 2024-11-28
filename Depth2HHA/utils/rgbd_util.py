@@ -1,6 +1,6 @@
 # --*-- coding:utf-8 --*--
 import numpy as np
-from utils.util import *
+from util import *
 
 np.seterr(divide='ignore', invalid='ignore')
 

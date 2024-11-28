@@ -1,4 +1,3 @@
-import random
 import torch
 import torch.nn as nn
 from utils import intersection_over_union
@@ -19,7 +18,7 @@ class YoloLoss(nn.Module):
 
     def forward(self, predictions, target, anchors):
         """
-        predicitions: (batch_size, num_anchors_on_scale, grid_size, grid_size, 5 + num_classes)
+        predictions: (batch_size, num_anchors_on_scale, grid_size, grid_size, 5 + num_classes)
         target: (batch_size, num_anchors_on_scale, grid_size, grid_size, 6)
         anchors: anchor boxes of shape (anchors_on_scale, 2) on a particular scale
         """

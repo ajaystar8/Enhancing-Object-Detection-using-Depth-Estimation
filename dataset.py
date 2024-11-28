@@ -116,9 +116,9 @@ class YOLODataset(Dataset):
                         [x_cell, y_cell, width_cell, height_cell])
 
                     targets[scale_idx][anchor_on_scale,
-                                       i, j, 1:5] = box_coordinates
+                    i, j, 1:5] = box_coordinates
                     targets[scale_idx][anchor_on_scale,
-                                       i, j, 5] = int(class_label)
+                    i, j, 5] = int(class_label)
                     has_anchor[scale_idx] = True
 
                 elif not anchor_taken and iou_anchors[anchor_index] > self.ignore_iou_thresh:
@@ -142,7 +142,7 @@ def test():
     )
     S = [13, 26, 52]
     scaled_anchors = torch.tensor(anchors) / (
-        1 / torch.tensor(S).unsqueeze(1).unsqueeze(1).repeat(1, 3, 2)
+            1 / torch.tensor(S).unsqueeze(1).unsqueeze(1).repeat(1, 3, 2)
     )
     loader = DataLoader(dataset=dataset, batch_size=1, shuffle=True)
     for x, y in loader:

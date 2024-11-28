@@ -553,6 +553,7 @@ def generate_train_test_indices(num_samples, train_ratio=0.8):
 
     return train_indices, test_indices
 
+
 def get_loaders_nyu(mat_file_path, train_ratio=0.8):
     """
     Creates data loaders for the NYU Depth Dataset with a train-test split.
@@ -633,6 +634,7 @@ def get_loaders_nyu(mat_file_path, train_ratio=0.8):
     )
 
     return train_loader, test_loader, train_eval_loader
+
 
 def seed_everything(seed=42):
     os.environ['PYTHONHASHSEED'] = str(seed)

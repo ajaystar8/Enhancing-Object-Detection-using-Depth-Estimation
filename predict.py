@@ -1,5 +1,4 @@
 from model import YOLOv3  # Replace with your model implementation
-from load_weights import load_darknet_weights
 from torchvision import transforms
 from PIL import Image
 import torch

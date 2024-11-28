@@ -1,26 +1,28 @@
 # --*-- coding:utf-8 --*--
-import numpy as np
 import cv2
+import numpy as np
 from scipy import signal
 
 '''
 helper function
 '''
+
+
 def filterItChopOff(f, r, sp):
     f[np.isnan(f)] = 0
     H, W, d = f.shape
-    B = np.ones([2 * r + 1, 2 * r + 1])     # 2r+1 * 2r+1 neighbourhood
+    B = np.ones([2 * r + 1, 2 * r + 1])  # 2r+1 * 2r+1 neighbourhood
 
     minSP = cv2.erode(sp, B, iterations=1)
     maxSP = cv2.dilate(sp, B, iterations=1)
 
     ind = np.where(np.logical_or(minSP != sp, maxSP != sp))
 
-    spInd = np.reshape(range(np.size(sp)), sp.shape,'F')
+    spInd = np.reshape(range(np.size(sp)), sp.shape, 'F')
 
     delta = np.zeros(f.shape)
     delta = np.reshape(delta, (H * W, d), 'F')
-    f = np.reshape(f, (H * W, d),'F')
+    f = np.reshape(f, (H * W, d), 'F')
 
     # calculate delta
 
@@ -28,7 +30,7 @@ def filterItChopOff(f, r, sp):
     for i in range(np.size(ind)):
         x = I[i]
         y = J[i]
-        clipInd = spInd[max(0, x - r):min(H-1, x + r), max(0, y - r):min(W-1, y + r)]
+        clipInd = spInd[max(0, x - r):min(H - 1, x + r), max(0, y - r):min(W - 1, y + r)]
         diffInd = clipInd[sp[clipInd] != sp[x, y]]
         delta[ind[i], :] = np.sum(f[diffInd, :], 1)
     delta = np.reshape(delta, (H, W, d), 'F')
@@ -43,9 +45,12 @@ def filterItChopOff(f, r, sp):
     fFilt = fFilt - delta
     return fFilt
 
+
 '''
 helper function
 '''
+
+
 def mutiplyIt(AtA_1, Atb):
     result = np.zeros([Atb.shape[0], Atb.shape[1], 3])
     result[:, :, 0] = np.multiply(AtA_1[:, :, 0], Atb[:, :, 0]) + np.multiply(AtA_1[:, :, 1],
@@ -59,9 +64,12 @@ def mutiplyIt(AtA_1, Atb):
         AtA_1[:, :, 5], Atb[:, :, 2])
     return result
 
+
 '''
 helper function
 '''
+
+
 def invertIt(AtA):
     AtA_1 = np.zeros([AtA.shape[0], AtA.shape[1], 6])
     AtA_1[:, :, 0] = np.multiply(AtA[:, :, 3], AtA[:, :, 5]) - np.multiply(AtA[:, :, 4], AtA[:, :, 4])
@@ -78,17 +86,21 @@ def invertIt(AtA):
     detAta = x1 + x2 + x3
     return AtA_1, detAta
 
+
 '''
 Compute the direction of gravity
 N: normal field
 iter: number of 'big' iterations
 '''
+
+
 def getYDir(N, angleThresh, iter, y0):
     y = y0
     for i in range(len(angleThresh)):
-        thresh = np.pi * angleThresh[i] / 180   # convert it to radian measure
+        thresh = np.pi * angleThresh[i] / 180  # convert it to radian measure
         y = getYDirHelper(N, y, thresh, iter[i])
     return y
+
 
 '''
 N: HxWx3 matrix with normal at each pixel.
@@ -96,37 +108,41 @@ y0: the initial gravity direction
 thresh: in degrees the threshold for mapping to parallel to gravity and perpendicular to gravity
 iter: number of iterations to perform
 '''
+
+
 def getYDirHelper(N, y0, thresh, num_iter):
     dim = N.shape[0] * N.shape[1]
 
     # change the third dimension to the first-order. (480, 680, 3) => (3, 480, 680)
-    nn = np.swapaxes(np.swapaxes(N,0,2),1,2)
+    nn = np.swapaxes(np.swapaxes(N, 0, 2), 1, 2)
     nn = np.reshape(nn, (3, dim), 'F')
 
     # remove these whose number is NAN
-    idx = np.where(np.invert(np.isnan(nn[0,:])))[0]
-    nn = nn[:,idx]
+    idx = np.where(np.invert(np.isnan(nn[0, :])))[0]
+    nn = nn[:, idx]
 
     # Set it up as a optimization problem
-    yDir = y0;
+    yDir = y0
     for i in range(num_iter):
         sim0 = np.dot(yDir.T, nn)
-        indF = abs(sim0) > np.cos(thresh)       # calculate 'floor' set.    |sin(theta)| < sin(thresh) ==> |cos(theta)| > cos(thresh)
-        indW = abs(sim0) < np.sin(thresh)       # calculate 'wall' set.
-        if(len(indF.shape) == 2):
-            NF = nn[:, indF[0,:]]
-            NW = nn[:, indW[0,:]]
+        indF = abs(sim0) > np.cos(
+            thresh)  # calculate 'floor' set.    |sin(theta)| < sin(thresh) ==> |cos(theta)| > cos(thresh)
+        indW = abs(sim0) < np.sin(thresh)  # calculate 'wall' set.
+        if len(indF.shape) == 2:
+            NF = nn[:, indF[0, :]]
+            NW = nn[:, indW[0, :]]
         else:
             NF = nn[:, indF]
             NW = nn[:, indW]
         A = np.dot(NW, NW.T) - np.dot(NF, NF.T)
-        b = np.zeros([3,1])
+        b = np.zeros([3, 1])
         c = NF.shape[1]
-        w,v = np.linalg.eig(A)      # w:eigenvalues; v:eigenvectors
-        min_ind = np.argmin(w)      # min index
-        newYDir = v[:,min_ind]
+        w, v = np.linalg.eig(A)  # w:eigenvalues; v:eigenvectors
+        min_ind = np.argmin(w)  # min index
+        newYDir = v[:, min_ind]
         yDir = newYDir * np.sign(np.dot(yDir.T, newYDir))
     return yDir
+
 
 '''
 getRMatrix: Generate a rotation matrix that
@@ -136,45 +152,24 @@ Input: yi is an axis 3x1 vector
        yf could be a scalar of axis
 
 '''
-# def getRMatrix(yi, yf):
-#     if (np.isscalar(yf)):
-#         ax = yi / np.linalg.norm(yi)        # norm(A) = max(svd(A))
-#         phi = yf
-#     else:
-#         yi = yi / np.linalg.norm(yi)
-#         yf = yf / np.linalg.norm(yf)
-#         ax = np.cross(yi.T, yf.T).T
-#         ax = ax / np.linalg.norm(ax)
-#         # find angle of rotation
-#         phi = np.degrees(np.arccos(np.dot(yi.T, yf)))
 
-#     if (abs(phi) > 0.1):
-#         phi = phi * (np.pi / 180)
-
-#         s_hat = np.array([[0, -ax[2], ax[1]],
-#                           [ax[2], 0, -ax[0]],
-#                           [-ax[1], ax[0], 0]])
-#         R = np.eye(3) + np.sin(phi) * s_hat + (1 - np.cos(phi)) * np.dot(s_hat, s_hat)      # dot???
-#     else:
-#         R = np.eye(3)
-#     return R
 
 def getRMatrix(yi, yf):
     # Ensure yi and yf are 1D vectors of length 3
     yi = np.reshape(yi, (3,))
     yf = np.reshape(yf, (3,))
-    
+
     if np.isscalar(yf):  # If yf is a scalar (angle)
-        ax = yi / np.linalg.norm(yi)        # Normalize yi
+        ax = yi / np.linalg.norm(yi)  # Normalize yi
         phi = yf
     else:  # If yf is a vector
         yi = yi / np.linalg.norm(yi)  # Normalize yi
         yf = yf / np.linalg.norm(yf)  # Normalize yf
-        
+
         # Cross product to find rotation axis
         ax = np.cross(yi, yf)
         ax = ax / np.linalg.norm(ax)  # Normalize the axis
-        
+
         # Calculate the angle of rotation
         phi = np.degrees(np.arccos(np.dot(yi, yf)))  # Angle in degrees
 
@@ -193,11 +188,14 @@ def getRMatrix(yi, yf):
 
     return R
 
+
 '''
 Calibration of gravity direction 
 '''
+
+
 def rotatePC(pc, R):
-    if(np.array_equal(R, np.eye(3))):
+    if np.array_equal(R, np.eye(3)):
         return pc
     else:
         R = R.astype(np.float64)

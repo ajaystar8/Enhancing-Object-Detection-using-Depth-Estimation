@@ -31,8 +31,15 @@ def train_fn(train_loader, model, optimizer, loss_fn, scaled_anchors):
             y[1].to(config.DEVICE),
             y[2].to(config.DEVICE)
         )
+        print(f"y[0]: {y[0].shape}")
+        print(f"y[1]: {y[1].shape}")
+        print(f"y[2]: {y[2].shape}")
 
         out = model(x)
+        print("Output shapes")
+        for item in out:
+            print(item.shape)
+
         loss = (
                 loss_fn(out[0], y0, scaled_anchors[0]) +
                 loss_fn(out[1], y1, scaled_anchors[1]) +
@@ -51,7 +58,7 @@ def train_fn(train_loader, model, optimizer, loss_fn, scaled_anchors):
 def main():
     model = YOLOv3(num_classes=config.NUM_CLASSES).to(config.DEVICE)
     # TODO: Fix loading of pre-trained weights
-    #load_darknet_weights(model, "./weights/yolov3.weights")
+    # load_darknet_weights(model, "./weights/yolov3.weights")
     optimizer = optim.Adam(
         model.parameters(), lr=config.LEARNING_RATE, weight_decay=config.WEIGHT_DECAY
     )

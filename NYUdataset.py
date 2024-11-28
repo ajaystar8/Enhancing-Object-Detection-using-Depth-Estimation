@@ -1,16 +1,15 @@
 import numpy as np
 import torch
 from torch.utils.data import Dataset, DataLoader
-from PIL import Image
-import albumentations as A
-from albumentations.pytorch import ToTensorV2
+
+import config
 from utils import (
     cells_to_bboxes,
     iou_width_height,
     non_max_suppression,
     plot_image
 )
-import config
+
 
 class NYUYoloDataset(Dataset):
     def __init__(self, mat_file, anchors, image_size=416, S=None, C=40, transform=None, indices=None):
@@ -29,9 +28,9 @@ class NYUYoloDataset(Dataset):
         with h5py.File(mat_file, "r") as f:
             self.data = {key: np.array(f[key]) for key in f.keys()}
             self.images = np.rot90(self.data["images"], k=-1, axes=(2, 3))  # (N, 3, H, W), Rotate HxW axes
-            self.instances = np.rot90(self.data["instances"], k=-1, axes=(1, 2)) # (N, H, W)
-            self.labels = np.rot90(self.data["labels"], k=-1, axes=(1, 2)) # (N, H, W)
-                # Use only the specified subset of data if indices are provided
+            self.instances = np.rot90(self.data["instances"], k=-1, axes=(1, 2))  # (N, H, W)
+            self.labels = np.rot90(self.data["labels"], k=-1, axes=(1, 2))  # (N, H, W)
+            # Use only the specified subset of data if indices are provided
         if indices is not None:
             self.images = self.images[indices]
             self.instances = self.instances[indices]
@@ -97,17 +96,18 @@ class NYUYoloDataset(Dataset):
                     targets[scale_idx][anchor_on_scale, i, j, 0] = -1
 
         return image, tuple(targets)
-    
-    def _get_instance_masks(self, img_object_labels, img_instances):
-        '''
+
+    @staticmethod
+    def _get_instance_masks(img_object_labels, img_instances):
+        """
         Extracts instance masks and labels from the object labels and instance maps.
         Args:
-            imgObjectLabels (numpy.ndarray): 2D array (H, W) with object labels for each pixel.
-            imgInstances (numpy.ndarray): 2D array (H, W) with instance IDs for each pixel.
+            img_object_labels (numpy.ndarray): 2D array (H, W) with object labels for each pixel.
+            img_instances (numpy.ndarray): 2D array (H, W) with instance IDs for each pixel.
         Returns:
             instanceMasks (numpy.ndarray): 3D array (H, W, N) with binary masks for each instance.
             instanceLabels (numpy.ndarray): 1D array (N,) with class labels for each instance.
-        '''
+        """
         H, W = img_object_labels.shape
 
         # Find unique (label, instance_id) pairs
@@ -155,14 +155,15 @@ class NYUYoloDataset(Dataset):
             height = (y_max - y_min) / H
 
             # If the bounding box does not meet the requirement of the YOLO model, skip it
-            if x_center <= 0 or y_center <= 0 or width <= 0 or height <= 0 or x_center >= 1 or y_center >= 1 or width >= 1 or height >= 1:
+            if (x_center <= 0 or y_center <= 0 or width <= 0 or height <= 0 or
+                    x_center >= 1 or y_center >= 1 or width >= 1 or height >= 1):
                 continue
 
             # Append the bounding box and class label
             bboxes.append([x_center, y_center, width, height, class_label])
 
         return bboxes
-    
+
 
 def test():
     anchors = config.ANCHORS
@@ -177,9 +178,9 @@ def test():
 
     S = [13, 26, 52]
     scaled_anchors = torch.tensor(anchors) / (
-        1 / torch.tensor(S).unsqueeze(1).unsqueeze(1).repeat(1, 3, 2)
+            1 / torch.tensor(S).unsqueeze(1).unsqueeze(1).repeat(1, 3, 2)
     )
-    index = 3
+    # index = 3
     loader = DataLoader(
         dataset=dataset,
         batch_size=config.BATCH_SIZE,
@@ -196,9 +197,10 @@ def test():
                 y[i], is_preds=False, S=y[i].shape[2], anchors=anchor
             )[0]
         boxes = non_max_suppression(boxes, iou_threshold=1,
-                    threshold=0.7, box_format="midpoint")
+                                    threshold=0.7, box_format="midpoint")
         plot_image(x[0].permute(1, 2, 0).to("cpu"), boxes)
         break
-    
+
+
 if __name__ == "__main__":
     test()

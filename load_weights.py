@@ -1,122 +1,151 @@
 import numpy as np
 import torch
+import torch.nn as nn
 
 
-################################################### IGNORE FOR NOW ###################################################
-def parse_cfg(fp):
-    """
-    Parses the darknet config file
+class LoadYOLOWeights:
 
-    return a list of dicts, each of which represents a block
-    """
+    def __init__(self, config_file_path, weights_file_path):
+        self.config_file_path = config_file_path
+        self.weights_file_path = weights_file_path
 
-    with open(fp) as cfg:
-        lines = [x.strip() for x in cfg.readlines()]  # Filter out all '\n's
-        lines = [x for x in lines if len(x) > 0 and x[0] != '#']  # Filter out the comments and blank lines
-        # print(lines)
-        assert lines[0][0] == '['
+    def _extract_layers(self, module: nn.Module):
+        """
+        Takes a nn.Module object and returns a list of all the submodules. Extracts the layers/submodules recursively.
 
-        blocks = []
+        :rtype: List of all layers in the passed module
+        """
+        layers = []
+        for name, submodule in module.named_children():
+            # If the submodule has children, recursively process them
+            if list(submodule.children()):
+                layers.extend(self._extract_layers(submodule))
+            else:
+                # Append as [name, submodule] for leaf modules
+                if not name == "leaky":
+                    layers.append([name, submodule])
+        return layers
+
+    def _parse_cfg(self):
+        """
+        Takes a configuration file
+
+        Returns a list of blocks. Each block describes a block in the neural
+        network to be built. Block is represented as a dictionary in the list
+
+        """
+        file = open(self.config_file_path, 'r')
+        lines = file.read().split('\n')  # store the lines in a list
+        lines = [x for x in lines if len(x) > 0]  # get read of the empty lines
+        lines = [x for x in lines if x[0] != '#']
+        lines = [x.rstrip().lstrip() for x in lines]
+
         block = {}
+        blocks = []
+
         for line in lines:
-            if line[0] == '[':
+            if line[0] == "[":  # This marks the start of a new block
                 if len(block) != 0:
                     blocks.append(block)
-                block = {'type': line[1:-1]}
+                    block = {}
+                block["type"] = line[1:-1].rstrip()
             else:
-                key_, value_ = line.split('=')
-                block[key_.strip()] = value_.strip()
-
+                key, value = line.split("=")
+                block[key.rstrip()] = value.lstrip()
         blocks.append(block)
         return blocks
 
+    def load(self, model: nn.Module):
+        fp = open(self.weights_file_path, "rb")
+        header = torch.from_numpy(np.fromfile(fp, dtype=np.int32, count=5))
 
-def load_darknet_weights(model, fp_weights, fp_config):
-    # Thanks to
-    # https://blog.paperspace.com/how-to-implement-a-yolo-v3-object-detector-from-scratch-in-pytorch-part-3/
-    blocks = parse_cfg(fp_config)
-    with open(fp_weights, 'rb') as weight_file:
-        # The first 5 values are header information
-        # 1. Major version number
-        # 2. Minor Version Number
-        # 3. Subversion number
-        # 4,5. Images seen by the network (during training)
-        header = np.fromfile(weight_file, dtype=np.int32, count=5)
-        header = torch.from_numpy(header)
-        seen = header[3]
-        module_list = list(model.modules())
-
-        weights = np.fromfile(weight_file, dtype=np.float32)
+        # The rest of the values are the weights
+        weights = np.fromfile(fp, dtype=np.float32)
         weights_length = len(weights)
+
+        darknet_module_list = self._parse_cfg()
+        module_list = self._extract_layers(model)
+
         ptr = 0
-        for i in range(len(module_list)):
-            module_type = blocks[i + 1]["type"]
+        model_idx = 0
+        darknet_idx = 1
+        while model_idx < len(module_list) and darknet_idx < len(darknet_module_list):
 
-            # If module_type is convolutional load weights, Otherwise ignore.
-            if module_type == "convolutional":
-                model = module_list[i]
-                conv = model[0]
-                batch_normalize = int(blocks[i + 1]["batch_normalize"]) \
-                    if "batch_normalize" in blocks[i + 1] else 0
+            # Load weights only for conv, conv-bias and batch-norm layers
+            darknet_module_type = darknet_module_list[darknet_idx]["type"]
+            if darknet_module_type != "convolutional":
+                darknet_idx += 1
+                continue
 
-                if batch_normalize:
-                    bn = model[1]
+            if module_list[model_idx][0] != "conv":
+                model_idx += 1
+                continue
 
-                    # Get the number of weights of Batch Norm Layer
-                    num_bn_biases = bn.bias.numel()
+            # if batch norm present, it should follow the conv layer
+            try:
+                batch_normalize = int(darknet_module_list[darknet_idx]["batch_normalize"])
+            except:
+                batch_normalize = 0
 
-                    # Load the weights
-                    bn_biases = torch.from_numpy(
-                        weights[ptr:ptr + num_bn_biases])
-                    ptr += num_bn_biases
-                    bn_weights = torch.from_numpy(
-                        weights[ptr: ptr + num_bn_biases])
-                    ptr += num_bn_biases
-                    bn_running_mean = torch.from_numpy(
-                        weights[ptr: ptr + num_bn_biases])
-                    ptr += num_bn_biases
-                    bn_running_var = torch.from_numpy(
-                        weights[ptr: ptr + num_bn_biases])
-                    ptr += num_bn_biases
+            conv = module_list[model_idx][1]
 
-                    # Cast the loaded weights into dims of model weights.
-                    bn_biases = bn_biases.view_as(bn.bias.data)
-                    bn_weights = bn_weights.view_as(bn.weight.data)
-                    bn_running_mean = bn_running_mean.view_as(
-                        bn.running_mean)
-                    bn_running_var = bn_running_var.view_as(bn.running_var)
+            if batch_normalize:
+                # Batch Norm Layer, if present, is always placed after the conv layer
+                bn = module_list[model_idx + 1][1]
 
-                    # Copy the data to model
-                    bn.bias.data.copy_(bn_biases)
-                    bn.weight.data.copy_(bn_weights)
-                    bn.running_mean.copy_(bn_running_mean)
-                    bn.running_var.copy_(bn_running_var)
+                # Get the number of weights of Batch Norm Layer
+                num_bn_biases = bn.bias.numel()
 
-                else:
-                    # Number of biases
-                    num_biases = conv.bias.numel()
+                # Load the weights
+                bn_biases = torch.from_numpy(weights[ptr:ptr + num_bn_biases])
+                ptr += num_bn_biases
 
-                    # Load the weights
-                    conv_biases = torch.from_numpy(
-                        weights[ptr: ptr + num_biases])
-                    ptr = ptr + num_biases
+                bn_weights = torch.from_numpy(weights[ptr: ptr + num_bn_biases])
+                ptr += num_bn_biases
 
-                    # reshape the loaded weights according to the dims of the model weights
-                    conv_biases = conv_biases.view_as(conv.bias.data)
+                bn_running_mean = torch.from_numpy(weights[ptr: ptr + num_bn_biases])
+                ptr += num_bn_biases
 
-                    # Finally copy the data
-                    conv.bias.data.copy_(conv_biases)
+                bn_running_var = torch.from_numpy(weights[ptr: ptr + num_bn_biases])
+                ptr += num_bn_biases
 
-                # Let us load the weights for the Convolutional layers
-                num_weights = conv.weight.numel()
+                # Cast the loaded weights into dims of model weights.
+                bn_biases = bn_biases.view_as(bn.bias.data)
+                bn_weights = bn_weights.view_as(bn.weight.data)
+                bn_running_mean = bn_running_mean.view_as(bn.running_mean)
+                bn_running_var = bn_running_var.view_as(bn.running_var)
 
-                # Do the same as above for weights
-                conv_weights = torch.from_numpy(
-                    weights[ptr:ptr + num_weights])
-                ptr = ptr + num_weights
+                # Copy the data to model
+                bn.bias.data.copy_(bn_biases)
+                bn.weight.data.copy_(bn_weights)
+                bn.running_mean.copy_(bn_running_mean)
+                bn.running_var.copy_(bn_running_var)
 
-                conv_weights = conv_weights.view_as(conv.weight.data)
-                conv.weight.data.copy_(conv_weights)
+            else:
+                # Number of biases
+                num_biases = conv.bias.numel()
 
-        assert ptr == weights_length
-        print(f'{ptr} of {weights_length} read')
+                # Load the weights
+                conv_biases = torch.from_numpy(weights[ptr: ptr + num_biases])
+                ptr = ptr + num_biases
+
+                # reshape the loaded weights according to the dims of the model weights
+                conv_biases = conv_biases.view_as(conv.bias.data)
+
+                # Finally copy the data
+                conv.bias.data.copy_(conv_biases)
+
+            # Let us load the weights for the Convolutional layers
+            num_weights = conv.weight.numel()
+
+            # Do the same as above for weights
+            conv_weights = torch.from_numpy(weights[ptr:ptr + num_weights])
+            ptr = ptr + num_weights
+
+            conv_weights = conv_weights.view_as(conv.weight.data)
+            conv.weight.data.copy_(conv_weights)
+
+            darknet_idx += 1
+            model_idx += 1
+
+        assert ptr == weights_length, f"{weights_length - ptr} weights were not read."

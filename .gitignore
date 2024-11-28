@@ -35,3 +35,5 @@ __*
 *.tar
 weights
 NYUD_Utils/depth
+scratch_notebooks/
+resources/nyu_depth_v2_labeled.mat
