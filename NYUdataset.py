@@ -1,7 +1,7 @@
 import numpy as np
 import torch
-from torch.utils.data import Dataset, DataLoader
 from pymatreader import read_mat
+from torch.utils.data import Dataset, DataLoader
 
 import config
 from utils import (
@@ -37,6 +37,7 @@ class NYUYoloDataset(Dataset):
             self.instances = self.instances[indices]
             self.labels = self.labels[indices]
         self.mat_file = mat_file
+        self.categories = read_mat(self.mat_file, variable_names=['names'])
         self.anchors = torch.tensor(anchors[0] + anchors[1] + anchors[2])
         self.num_anchors = self.anchors.shape[0]
         self.num_anchors_per_scale = self.num_anchors // 3
@@ -64,7 +65,7 @@ class NYUYoloDataset(Dataset):
         image = np.transpose(image, (1, 2, 0)).astype(np.uint8)
 
         # Extract bounding boxes
-        bboxes = self._get_bounding_boxes(instance_map, label_map, config.NYU_TARGET_CATEGORIES)
+        bboxes = self._get_bounding_boxes(instance_map, label_map)
 
         # Apply transformations
         if self.transform:
@@ -100,12 +101,21 @@ class NYUYoloDataset(Dataset):
         return image, tuple(targets)
 
     def _map_ids_to_names(self):
-        data = read_mat(self.mat_file, variable_names=['names'])
         ids_to_names = {}
-        namesToIds = {name: (n + 1) for n, name in enumerate(data['names'])}
+        namesToIds = {name: (n + 1) for n, name in enumerate(self.categories['names'])}
         for key, value in namesToIds.items():
             ids_to_names[value] = key
         return ids_to_names
+
+    def _skip(self, class_label):
+        ids_to_names = self._map_ids_to_names()
+        if class_label == 0:
+            return True
+        class_label_str = ids_to_names[class_label]
+        if class_label_str not in config.NYU_TARGET_CATEGORIES:
+            return True
+        else:
+            return False
 
     @staticmethod
     def _get_instance_masks(img_object_labels, img_instances):
@@ -135,7 +145,7 @@ class NYUYoloDataset(Dataset):
 
         return instance_masks, instance_labels
 
-    def _get_bounding_boxes(self, instance_map, label_map, target_categories):
+    def _get_bounding_boxes(self, instance_map, label_map):
         """
         Extracts bounding boxes and class labels using get_instance_masks.
         Args:
@@ -146,16 +156,13 @@ class NYUYoloDataset(Dataset):
         """
         # Use get_instance_masks to extract binary masks and instance labels
         instance_masks, instance_labels = self._get_instance_masks(label_map, instance_map)
-        ids_to_names = self._map_ids_to_names()
 
         bboxes = []
         for i in range(instance_masks.shape[-1]):
             mask = instance_masks[:, :, i]  # Binary mask for the current instance
             class_label = instance_labels[i] - 1  # Corresponding class label
-            if class_label == 0:
-                continue
-            class_label_str = ids_to_names[class_label]
-            if class_label_str not in target_categories:
+
+            if self._skip(class_label):
                 continue
 
             # Find the bounding box from the mask
