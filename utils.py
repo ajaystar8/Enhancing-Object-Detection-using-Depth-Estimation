@@ -236,7 +236,13 @@ def mean_average_precision(
 def plot_image(image, boxes):
     """Plots predicted bounding boxes on the image"""
     cmap = plt.get_cmap("tab20b")
-    class_labels = config.COCO_LABELS if config.DATASET == 'COCO' else config.PASCAL_CLASSES
+    if config.DATASET == 'COCO':
+        class_labels = config.COCO_LABELS
+    elif config.DATASET == 'NYUv2':
+        class_labels = config.NYU_LABELS
+    else:
+        class_labels = config.PASCAL_CLASSES
+    print(class_labels.__len__())
     colors = [cmap(i) for i in np.linspace(0, 1, len(class_labels))]
     im = np.array(image)
     height, width, _ = im.shape
@@ -525,6 +531,108 @@ def plot_couple_examples(model, loader, thresh, iou_thresh, anchors):
         )
         plot_image(x[i].permute(1, 2, 0).detach().cpu(), nms_boxes)
 
+
+def generate_train_test_indices(num_samples, train_ratio=0.8):
+    """
+    Splits indices into training and testing subsets.
+
+    Args:
+        num_samples (int): Total number of samples in the dataset.
+        train_ratio (float): Proportion of samples to use for training.
+
+    Returns:
+        train_indices (numpy.ndarray): Indices for the training subset.
+        test_indices (numpy.ndarray): Indices for the testing subset.
+    """
+    indices = np.arange(num_samples)
+    np.random.shuffle(indices)
+
+    split_idx = int(num_samples * train_ratio)
+    train_indices = indices[:split_idx]
+    test_indices = indices[split_idx:]
+
+    return train_indices, test_indices
+
+def get_loaders_nyu(mat_file_path, train_ratio=0.8):
+    """
+    Creates data loaders for the NYU Depth Dataset with a train-test split.
+
+    Args:
+        mat_file_path (str): Path to the .mat file containing the NYU dataset.
+        train_ratio (float): Proportion of the dataset to use for training.
+
+    Returns:
+        train_loader (DataLoader): DataLoader for training data.
+        test_loader (DataLoader): DataLoader for testing data.
+        train_eval_loader (DataLoader): DataLoader for evaluating training data.
+    """
+    # Load the number of samples in the dataset
+    import h5py
+    with h5py.File(mat_file_path, "r") as f:
+        num_samples = len(f["images"])
+
+    # Import the necessary classes and functions
+    from NYUdataset import NYUYoloDataset
+
+    # Generate train and test indices
+    train_indices, test_indices = generate_train_test_indices(num_samples, train_ratio)
+
+    # Create training and testing datasets
+    train_dataset = NYUYoloDataset(
+        mat_file=mat_file_path,
+        anchors=config.ANCHORS,
+        image_size=config.IMAGE_SIZE,
+        S=[config.IMAGE_SIZE // 32, config.IMAGE_SIZE // 16, config.IMAGE_SIZE // 8],
+        C=40,
+        transform=config.train_transforms,
+        indices=train_indices,
+    )
+    test_dataset = NYUYoloDataset(
+        mat_file=mat_file_path,
+        anchors=config.ANCHORS,
+        image_size=config.IMAGE_SIZE,
+        S=[config.IMAGE_SIZE // 32, config.IMAGE_SIZE // 16, config.IMAGE_SIZE // 8],
+        C=40,
+        transform=config.test_transforms,
+        indices=test_indices,
+    )
+    train_eval_dataset = NYUYoloDataset(
+        mat_file=mat_file_path,
+        anchors=config.ANCHORS,
+        image_size=config.IMAGE_SIZE,
+        S=[config.IMAGE_SIZE // 32, config.IMAGE_SIZE // 16, config.IMAGE_SIZE // 8],
+        C=40,
+        transform=config.test_transforms,
+        indices=train_indices,
+    )
+
+    # Create DataLoaders
+    train_loader = DataLoader(
+        dataset=train_dataset,
+        batch_size=config.BATCH_SIZE,
+        num_workers=config.NUM_WORKERS,
+        pin_memory=config.PIN_MEMORY,
+        shuffle=True,
+        drop_last=False,
+    )
+    test_loader = DataLoader(
+        dataset=test_dataset,
+        batch_size=config.BATCH_SIZE,
+        num_workers=config.NUM_WORKERS,
+        pin_memory=config.PIN_MEMORY,
+        shuffle=False,
+        drop_last=False,
+    )
+    train_eval_loader = DataLoader(
+        dataset=train_eval_dataset,
+        batch_size=config.BATCH_SIZE,
+        num_workers=config.NUM_WORKERS,
+        pin_memory=config.PIN_MEMORY,
+        shuffle=False,
+        drop_last=False,
+    )
+
+    return train_loader, test_loader, train_eval_loader
 
 def seed_everything(seed=42):
     os.environ['PYTHONHASHSEED'] = str(seed)
