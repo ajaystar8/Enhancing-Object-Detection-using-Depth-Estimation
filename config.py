@@ -324,4 +324,8 @@ NYU_LABELS = ['book', 'bottle', 'cabinet', 'ceiling', 'chair', 'cone', 'counter'
               'hammer', 'matchbox', 'pepper', 'yellow pepper', 'duck', 'eggplant', 'glass ware', 'sewing machine',
               'rolled up rug', 'doily', 'coffee pot', 'torah']
 
-NUM_CLASSES = 20 if DATASET != 'NYUv2' else NYU_LABELS.__len__()
+NYU_TARGET_CATEGORIES = ['bathtub', 'bed', 'bookshelf', 'box', 'chair', 'counter', 'desk', 'door', 'dresser',
+                         'garbage-bin', 'lamp', 'monitor', 'night-stand', 'pillow', 'sink', 'sofa', 'table',
+                         'television', 'toilet']
+
+NUM_CLASSES = 20 if DATASET != 'NYUv2' else NYU_TARGET_CATEGORIES.__len__()

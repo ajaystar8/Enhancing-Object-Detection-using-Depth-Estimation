@@ -242,7 +242,7 @@ def plot_image(image, boxes):
         class_labels = config.NYU_LABELS
     else:
         class_labels = config.PASCAL_CLASSES
-    print(class_labels.__len__())
+    # print(class_labels.__len__())
     colors = [cmap(i) for i in np.linspace(0, 1, len(class_labels))]
     im = np.array(image)
     height, width, _ = im.shape

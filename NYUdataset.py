@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 from torch.utils.data import Dataset, DataLoader
+from pymatreader import read_mat
 
 import config
 from utils import (
@@ -35,6 +36,7 @@ class NYUYoloDataset(Dataset):
             self.images = self.images[indices]
             self.instances = self.instances[indices]
             self.labels = self.labels[indices]
+        self.mat_file = mat_file
         self.anchors = torch.tensor(anchors[0] + anchors[1] + anchors[2])
         self.num_anchors = self.anchors.shape[0]
         self.num_anchors_per_scale = self.num_anchors // 3
@@ -62,7 +64,7 @@ class NYUYoloDataset(Dataset):
         image = np.transpose(image, (1, 2, 0)).astype(np.uint8)
 
         # Extract bounding boxes
-        bboxes = self._get_bounding_boxes(instance_map, label_map)
+        bboxes = self._get_bounding_boxes(instance_map, label_map, config.NYU_TARGET_CATEGORIES)
 
         # Apply transformations
         if self.transform:
@@ -97,6 +99,14 @@ class NYUYoloDataset(Dataset):
 
         return image, tuple(targets)
 
+    def _map_ids_to_names(self):
+        data = read_mat(self.mat_file, variable_names=['names'])
+        ids_to_names = {}
+        namesToIds = {name: (n + 1) for n, name in enumerate(data['names'])}
+        for key, value in namesToIds.items():
+            ids_to_names[value] = key
+        return ids_to_names
+
     @staticmethod
     def _get_instance_masks(img_object_labels, img_instances):
         """
@@ -125,7 +135,7 @@ class NYUYoloDataset(Dataset):
 
         return instance_masks, instance_labels
 
-    def _get_bounding_boxes(self, instance_map, label_map):
+    def _get_bounding_boxes(self, instance_map, label_map, target_categories):
         """
         Extracts bounding boxes and class labels using get_instance_masks.
         Args:
@@ -136,11 +146,17 @@ class NYUYoloDataset(Dataset):
         """
         # Use get_instance_masks to extract binary masks and instance labels
         instance_masks, instance_labels = self._get_instance_masks(label_map, instance_map)
+        ids_to_names = self._map_ids_to_names()
 
         bboxes = []
         for i in range(instance_masks.shape[-1]):
             mask = instance_masks[:, :, i]  # Binary mask for the current instance
             class_label = instance_labels[i] - 1  # Corresponding class label
+            if class_label == 0:
+                continue
+            class_label_str = ids_to_names[class_label]
+            if class_label_str not in target_categories:
+                continue
 
             # Find the bounding box from the mask
             y, x = np.where(mask)  # Get mask coordinates
@@ -199,7 +215,6 @@ def test():
         boxes = non_max_suppression(boxes, iou_threshold=1,
                                     threshold=0.7, box_format="midpoint")
         plot_image(x[0].permute(1, 2, 0).to("cpu"), boxes)
-        break
 
 
 if __name__ == "__main__":
