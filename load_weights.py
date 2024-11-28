@@ -2,10 +2,12 @@ import numpy as np
 import torch
 import torch.nn as nn
 
+from model import YOLOv3
+
 
 class LoadYOLOWeights:
 
-    def __init__(self, config_file_path, weights_file_path):
+    def __init__(self, config_file_path: str, weights_file_path: str):
         self.config_file_path = config_file_path
         self.weights_file_path = weights_file_path
 
@@ -66,6 +68,10 @@ class LoadYOLOWeights:
         darknet_module_list = self._parse_cfg()
         module_list = self._extract_layers(model)
 
+        # Number of weights to be skipped (predicition layer)
+        skip_idx = 0
+        skip_weights = [261120, 255, 130560, 255, 65280, 255]
+
         ptr = 0
         model_idx = 0
         darknet_idx = 1
@@ -84,8 +90,19 @@ class LoadYOLOWeights:
             # if batch norm present, it should follow the conv layer
             try:
                 batch_normalize = int(darknet_module_list[darknet_idx]["batch_normalize"])
-            except:
+            except KeyError:
                 batch_normalize = 0
+                # Do not load weights if the layer does not have a batch norm layer -> Because
+                # it is that block which makes the predictions.
+
+                ptr += skip_weights[skip_idx]
+                skip_idx += 1
+                ptr += skip_weights[skip_idx]
+                skip_idx += 1
+
+                model_idx += 1
+                darknet_idx += 1
+                continue
 
             conv = module_list[model_idx][1]
 
@@ -149,3 +166,14 @@ class LoadYOLOWeights:
             model_idx += 1
 
         assert ptr == weights_length, f"{weights_length - ptr} weights were not read."
+
+
+if __name__ == "__main__":
+    num_classes = 19
+    config_file_path = "./weights/yolov3.cfg"
+    weights_file_path = "./weights/yolov3.weights"
+
+    model = YOLOv3(num_classes=num_classes)
+    # summary(model, (3, 416, 416))
+    weight_loader = LoadYOLOWeights(config_file_path, weights_file_path)
+    weight_loader.load(model)
