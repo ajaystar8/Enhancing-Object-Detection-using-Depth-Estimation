@@ -14,7 +14,8 @@ from utils import (
     load_checkpoint,
     check_class_accuracy,
     get_loaders,
-    plot_couple_examples
+    plot_couple_examples,
+    get_loaders_nyu
 )
 from loss import YoloLoss
 
@@ -58,6 +59,8 @@ def main():
 
     train_loader, test_loader, train_eval_loader = get_loaders(
         train_csv_path=config.DATASET + "/train.csv", test_csv_path=config.DATASET + "/test.csv"
+    ) if not config.DATASET == 'NYUv2' else get_loaders_nyu(
+        mat_file_path=config.NYU_PATH
     )
 
     if config.LOAD_MODEL:
