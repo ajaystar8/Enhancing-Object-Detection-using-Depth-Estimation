@@ -3,7 +3,7 @@ import torch
 import torch.optim as optim
 import os
 
-# from load_weights import load_darknet_weights
+from load_weights import LoadYOLOWeights
 from model import YOLOv3
 from tqdm import tqdm
 from utils import (
@@ -56,10 +56,14 @@ def train_fn(train_loader, model, optimizer, loss_fn, scaled_anchors):
         loop.set_postfix(loss=mean_loss)
 
 
-def main():
-    model = YOLOv3(num_classes=config.NUM_CLASSES).to(config.DEVICE)
+def main():   
     # TODO: Fix loading of pre-trained weights
-    # load_darknet_weights(model, "./weights/yolov3.weights")
+    config_file_path = "./weights/yolov3.cfg"
+    weights_file_path = "./weights/yolov3.weights"
+    model = YOLOv3(num_classes=config.NUM_CLASSES).to(config.DEVICE)
+    weight_loader = LoadYOLOWeights(config_file_path, weights_file_path)
+    weight_loader.load(model)
+    
     optimizer = optim.Adam(
         model.parameters(), lr=config.LEARNING_RATE, weight_decay=config.WEIGHT_DECAY
     )
