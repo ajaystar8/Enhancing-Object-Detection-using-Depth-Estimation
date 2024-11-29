@@ -325,7 +325,7 @@ NYU_LABELS = ['book', 'bottle', 'cabinet', 'ceiling', 'chair', 'cone', 'counter'
               'rolled up rug', 'doily', 'coffee pot', 'torah']
 
 NYU_TARGET_CATEGORIES = ['bathtub', 'bed', 'bookshelf', 'box', 'chair', 'counter', 'desk', 'door', 'dresser',
-                         'garbage-bin', 'lamp', 'monitor', 'night-stand', 'pillow', 'sink', 'sofa', 'table',
+                         'garbage bin', 'lamp', 'monitor', 'night stand', 'pillow', 'sink', 'sofa', 'table',
                          'television', 'toilet']
 
 NUM_CLASSES = 20 if DATASET != 'NYUv2' else NYU_TARGET_CATEGORIES.__len__()

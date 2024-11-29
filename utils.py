@@ -239,7 +239,7 @@ def plot_image(image, boxes):
     if config.DATASET == 'COCO':
         class_labels = config.COCO_LABELS
     elif config.DATASET == 'NYUv2':
-        class_labels = config.NYU_LABELS
+        class_labels = config.NYU_TARGET_CATEGORIES
     else:
         class_labels = config.PASCAL_CLASSES
     # print(class_labels.__len__())
@@ -587,6 +587,7 @@ def get_loaders_nyu(mat_file_path, train_ratio=0.8):
         C=40,
         transform=config.train_transforms,
         indices=train_indices,
+        use_only_target_categories=True,
     )
     test_dataset = NYUYoloDataset(
         mat_file=mat_file_path,
@@ -596,6 +597,7 @@ def get_loaders_nyu(mat_file_path, train_ratio=0.8):
         C=40,
         transform=config.test_transforms,
         indices=test_indices,
+        use_only_target_categories=True,
     )
     train_eval_dataset = NYUYoloDataset(
         mat_file=mat_file_path,
@@ -605,6 +607,7 @@ def get_loaders_nyu(mat_file_path, train_ratio=0.8):
         C=40,
         transform=config.test_transforms,
         indices=train_indices,
+        use_only_target_categories=True,
     )
 
     # Create DataLoaders
@@ -634,6 +637,12 @@ def get_loaders_nyu(mat_file_path, train_ratio=0.8):
     )
 
     return train_loader, test_loader, train_eval_loader
+
+def get_nyu_target_category_indices():
+    '''
+    Returns the indices corresponding to the target categories in the NYU dataset.
+    '''
+    return [config.NYU_LABELS.index(category) for category in config.NYU_TARGET_CATEGORIES]
 
 
 def seed_everything(seed=42):

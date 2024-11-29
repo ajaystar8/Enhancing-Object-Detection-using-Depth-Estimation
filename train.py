@@ -3,7 +3,7 @@ import torch
 import torch.optim as optim
 import os
 
-from load_weights import load_darknet_weights
+# from load_weights import load_darknet_weights
 from model import YOLOv3
 from tqdm import tqdm
 from utils import (
@@ -15,7 +15,8 @@ from utils import (
     check_class_accuracy,
     get_loaders,
     plot_couple_examples,
-    get_loaders_nyu
+    get_loaders_nyu,
+    get_nyu_target_category_indices
 )
 from loss import YoloLoss
 

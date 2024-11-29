@@ -8,12 +8,13 @@ from utils import (
     cells_to_bboxes,
     iou_width_height,
     non_max_suppression,
-    plot_image
+    plot_image,
+    get_nyu_target_category_indices
 )
 
 
 class NYUYoloDataset(Dataset):
-    def __init__(self, mat_file, anchors, image_size=416, S=None, C=40, transform=None, indices=None):
+    def __init__(self, mat_file, anchors, image_size=416, S=None, C=40, transform=None, indices=None, use_only_target_categories=False):
         """
         Args:
             mat_file (str): Path to the .mat file containing the dataset.
@@ -46,6 +47,7 @@ class NYUYoloDataset(Dataset):
         self.S = S if S else [13, 26, 52]
         self.C = C
         self.transform = transform
+        self.use_only_target_categories = use_only_target_categories
 
     def __len__(self):
         return len(self.images)
@@ -65,7 +67,7 @@ class NYUYoloDataset(Dataset):
         image = np.transpose(image, (1, 2, 0)).astype(np.uint8)
 
         # Extract bounding boxes
-        bboxes = self._get_bounding_boxes(instance_map, label_map)
+        bboxes = self._get_bounding_boxes(instance_map, label_map, get_nyu_target_category_indices() if self.use_only_target_categories else None)
 
         # Apply transformations
         if self.transform:
@@ -145,7 +147,7 @@ class NYUYoloDataset(Dataset):
 
         return instance_masks, instance_labels
 
-    def _get_bounding_boxes(self, instance_map, label_map):
+    def _get_bounding_boxes(self, instance_map, label_map, nyu_target_indices=None):
         """
         Extracts bounding boxes and class labels using get_instance_masks.
         Args:
@@ -162,8 +164,14 @@ class NYUYoloDataset(Dataset):
             mask = instance_masks[:, :, i]  # Binary mask for the current instance
             class_label = instance_labels[i] - 1  # Corresponding class label
 
+            # Skip the instance if the class label is not in the target indices
+            if nyu_target_indices is not None and class_label not in nyu_target_indices:
+                continue
+            '''
+            # Skip the instance if the class label is not in the target categories
             if self._skip(class_label):
                 continue
+            '''
 
             # Find the bounding box from the mask
             y, x = np.where(mask)  # Get mask coordinates
@@ -183,7 +191,8 @@ class NYUYoloDataset(Dataset):
                 continue
 
             # Append the bounding box and class label
-            bboxes.append([x_center, y_center, width, height, class_label])
+            # Convert the class label to the index in the target indices
+            bboxes.append([x_center, y_center, width, height, nyu_target_indices.index(class_label) if self.use_only_target_categories else class_label]) 
 
         return bboxes
 
@@ -197,6 +206,7 @@ def test():
         S=[13, 26, 52],
         C=config.NYU_LABELS.__len__(),
         transform=config.train_transforms,
+        use_only_target_categories=True
     )
 
     S = [13, 26, 52]
