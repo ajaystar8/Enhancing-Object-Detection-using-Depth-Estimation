@@ -430,12 +430,15 @@ def get_mean_std(loader):
 
 
 def save_checkpoint(model, optimizer, filename="my_checkpoint.pth.tar"):
+
+    os.makedirs(os.path.dirname("./checkpoints"), exist_ok=True)
+
     print("=> Saving checkpoint")
     checkpoint = {
         "state_dict": model.state_dict(),
         "optimizer": optimizer.state_dict(),
     }
-    torch.save(checkpoint, filename)
+    torch.save(checkpoint, os.path.join("./checkpoints", filename))
 
 
 def load_checkpoint(checkpoint_file, model, optimizer, lr):

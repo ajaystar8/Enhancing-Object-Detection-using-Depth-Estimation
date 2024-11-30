@@ -1,14 +1,20 @@
-from model import YOLOv3  # Replace with your model implementation
-from torchvision import transforms
-from PIL import Image
+import numpy as np
 import torch
+from PIL import Image
+from torchvision import transforms
 
-# Define model
-model = YOLOv3(num_classes=20)  # Adjust `num_classes` for your dataset
+import config
+from load_weights import LoadYOLOWeights
+from model import YOLOv3
+from utils import cells_to_bboxes, plot_image
 
 # Load weights
-model.load_state_dict(torch.load("./weights/model_weights.pth"))
+config_file_path = "./weights/yolov3.cfg"
+weights_file_path = "./weights/yolov3.weights"
 
+model = YOLOv3(num_classes=config.NUM_CLASSES).to(config.DEVICE)
+weight_loader = LoadYOLOWeights(config_file_path, weights_file_path)
+weight_loader.load(model)
 
 # Switch to evaluation mode
 model.eval()
@@ -19,12 +25,15 @@ transform = transforms.Compose([
     transforms.Resize((416, 416)),
     transforms.ToTensor(),
 ])
-input_tensor = transform(image).unsqueeze(0)  # Add batch dimension
+input_tensor = transform(image).unsqueeze(0)
 
 # Inference
 with torch.no_grad():
     outputs = model(input_tensor)
 
-print((outputs[2].shape))
-print(torch.max(outputs[2]))
-print(torch.min(outputs[2]))
+    bboxes = cells_to_bboxes(outputs[2], np.array(config.ANCHORS[2]), 52, True)
+    print(len(bboxes[0]))
+    # plot_image(image, bboxes)
+
+
+

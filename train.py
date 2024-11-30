@@ -1,24 +1,20 @@
-import config
 import torch
 import torch.optim as optim
-import os
-
-from load_weights import LoadYOLOWeights
-from model import YOLOv3
 from tqdm import tqdm
+
+import config
+from load_weights import LoadYOLOWeights
+from loss import YoloLoss
+from model import YOLOv3
 from utils import (
     mean_average_precision,
-    cells_to_bboxes,
     get_evaluation_bboxes,
     save_checkpoint,
     load_checkpoint,
     check_class_accuracy,
     get_loaders,
-    plot_couple_examples,
-    get_loaders_nyu,
-    get_nyu_target_category_indices
+    get_loaders_nyu
 )
-from loss import YoloLoss
 
 
 def train_fn(train_loader, model, optimizer, loss_fn, scaled_anchors):
@@ -56,14 +52,13 @@ def train_fn(train_loader, model, optimizer, loss_fn, scaled_anchors):
         loop.set_postfix(loss=mean_loss)
 
 
-def main():   
-    # TODO: Fix loading of pre-trained weights
+def main():
     config_file_path = "./weights/yolov3.cfg"
     weights_file_path = "./weights/yolov3.weights"
     model = YOLOv3(num_classes=config.NUM_CLASSES).to(config.DEVICE)
     weight_loader = LoadYOLOWeights(config_file_path, weights_file_path)
     weight_loader.load(model)
-    
+
     optimizer = optim.Adam(
         model.parameters(), lr=config.LEARNING_RATE, weight_decay=config.WEIGHT_DECAY
     )
@@ -86,11 +81,13 @@ def main():
             * torch.tensor(config.S).unsqueeze(1).unsqueeze(1).repeat(1, 3, 2)
     ).to(config.DEVICE)
 
+    best_map_till_now = -1
+
     for epoch in range(config.NUM_EPOCHS):
         train_fn(train_loader, model, optimizer, loss_fn, scaled_anchors)
 
-        if config.SAVE_MODEL:
-            save_checkpoint(model, optimizer, filename=f"checkpoint.pth.tar")
+        if best_map_till_now < 0:
+            save_checkpoint(model, optimizer, filename=f"initial_ckpt.pth.tar")
 
         if epoch % 10 == 0 and epoch > 0:
             print("On Test loader:")
@@ -111,6 +108,11 @@ def main():
                 box_format="midpoint",
                 num_classes=config.NUM_CLASSES,
             )
+            if mapval > best_map_till_now:
+                print(
+                    "Model performance improved from {:.2f}% to {:.2f}!".format(best_map_till_now * 100, mapval * 100))
+                best_map_till_now = mapval
+                save_checkpoint(model, optimizer, filename=f"yolov3_rgb_ckpt.pth.tar")
             print(f"MAP: {mapval.item()}")
 
 

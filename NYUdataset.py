@@ -14,7 +14,8 @@ from utils import (
 
 
 class NYUYoloDataset(Dataset):
-    def __init__(self, mat_file, anchors, image_size=416, S=None, C=40, transform=None, indices=None, use_only_target_categories=False):
+    def __init__(self, mat_file, anchors, image_size=416, S=None, C=40, transform=None, indices=None,
+                 use_only_target_categories=False):
         """
         Args:
             mat_file (str): Path to the .mat file containing the dataset.
@@ -67,7 +68,9 @@ class NYUYoloDataset(Dataset):
         image = np.transpose(image, (1, 2, 0)).astype(np.uint8)
 
         # Extract bounding boxes
-        bboxes = self._get_bounding_boxes(instance_map, label_map, get_nyu_target_category_indices() if self.use_only_target_categories else None)
+        bboxes = self._get_bounding_boxes(instance_map, label_map,
+                                          get_nyu_target_category_indices()
+                                          if self.use_only_target_categories else None)
 
         # Apply transformations
         if self.transform:
@@ -192,7 +195,8 @@ class NYUYoloDataset(Dataset):
 
             # Append the bounding box and class label
             # Convert the class label to the index in the target indices
-            bboxes.append([x_center, y_center, width, height, nyu_target_indices.index(class_label) if self.use_only_target_categories else class_label]) 
+            bboxes.append([x_center, y_center, width, height,
+                           nyu_target_indices.index(class_label) if self.use_only_target_categories else class_label])
 
         return bboxes
 
