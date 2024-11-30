@@ -53,11 +53,10 @@ def train_fn(train_loader, model, optimizer, loss_fn, scaled_anchors):
 
 
 def main():
-    config_file_path = "./weights/yolov3.cfg"
-    weights_file_path = "./weights/yolov3.weights"
     model = YOLOv3(num_classes=config.NUM_CLASSES).to(config.DEVICE)
-    weight_loader = LoadYOLOWeights(config_file_path, weights_file_path)
+    weight_loader = LoadYOLOWeights(config.CONFIG_FILE_PATH, config.WEIGHTS_FILE_PATH)
     weight_loader.load(model)
+    model.freeze_backbone_weights()
 
     optimizer = optim.Adam(
         model.parameters(), lr=config.LEARNING_RATE, weight_decay=config.WEIGHT_DECAY
@@ -83,7 +82,9 @@ def main():
 
     best_map_till_now = -1
 
+    print("Training started!")
     for epoch in range(config.NUM_EPOCHS):
+        print(f"--------[EPOCH-{epoch+1}]-------------")
         train_fn(train_loader, model, optimizer, loss_fn, scaled_anchors)
 
         if best_map_till_now < 0:

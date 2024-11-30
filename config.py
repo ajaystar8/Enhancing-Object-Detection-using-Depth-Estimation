@@ -26,6 +26,10 @@ IMG_DIR = DATASET + "/images/"
 LABEL_DIR = DATASET + "/labels/"
 NYU_PATH = "./resources/nyu_depth_v2_labeled.mat"
 
+# YOLOv3 specific
+CONFIG_FILE_PATH = "./weights/yolov3.cfg"
+WEIGHTS_FILE_PATH = "./weights/yolov3.weights"
+
 '''
 In YoLov3, there are three prediction scale, where each predication scale has three anchor boxes. This means that
 when the entire image is divided into cells, each cell of the image has three anchor boxes. For example, the first 
