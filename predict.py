@@ -20,7 +20,7 @@ weight_loader.load(model)
 model.eval()
 
 # Preprocessing
-image = Image.open("./data/PASCAL_VOC/images/000006.jpg").convert("RGB")
+image = Image.open("../NYUD/images/0.png").convert("RGB")
 transform = transforms.Compose([
     transforms.Resize((416, 416)),
     transforms.ToTensor(),
