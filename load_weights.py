@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 
 from model import YOLOv3
+from utils import extract_layers
 
 
 class LoadYOLOWeights:
@@ -10,23 +11,6 @@ class LoadYOLOWeights:
     def __init__(self, config_file_path: str, weights_file_path: str):
         self.config_file_path = config_file_path
         self.weights_file_path = weights_file_path
-
-    def _extract_layers(self, module: nn.Module):
-        """
-        Takes a nn.Module object and returns a list of all the submodules. Extracts the layers/submodules recursively.
-
-        :rtype: List of all layers in the passed module
-        """
-        layers = []
-        for name, submodule in module.named_children():
-            # If the submodule has children, recursively process them
-            if list(submodule.children()):
-                layers.extend(self._extract_layers(submodule))
-            else:
-                # Append as [name, submodule] for leaf modules
-                if not name == "leaky":
-                    layers.append([name, submodule])
-        return layers
 
     def _parse_cfg(self):
         """
@@ -64,9 +48,8 @@ class LoadYOLOWeights:
         # The rest of the values are the weights
         weights = np.fromfile(fp, dtype=np.float32)
         weights_length = len(weights)
-
         darknet_module_list = self._parse_cfg()
-        module_list = self._extract_layers(model)
+        module_list = extract_layers(model)
 
         # Number of weights to be skipped (predicition layer)
         skip_idx = 0
@@ -75,6 +58,7 @@ class LoadYOLOWeights:
         ptr = 0
         model_idx = 0
         darknet_idx = 1
+
         while model_idx < len(module_list) and darknet_idx < len(darknet_module_list):
 
             # Load weights only for conv, conv-bias and batch-norm layers
@@ -177,3 +161,4 @@ if __name__ == "__main__":
     # summary(model, (3, 416, 416))
     weight_loader = LoadYOLOWeights(config_file_path, weights_file_path)
     weight_loader.load(model)
+    model.freeze_backbone_weights()

@@ -6,6 +6,7 @@ import matplotlib.patches as patches
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
+import torch.nn as nn
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
@@ -430,7 +431,6 @@ def get_mean_std(loader):
 
 
 def save_checkpoint(model, optimizer, filename="my_checkpoint.pth.tar"):
-
     os.makedirs(os.path.dirname("./checkpoints"), exist_ok=True)
 
     print("=> Saving checkpoint")
@@ -641,6 +641,7 @@ def get_loaders_nyu(mat_file_path, train_ratio=0.8):
 
     return train_loader, test_loader, train_eval_loader
 
+
 def get_nyu_target_category_indices():
     '''
     Returns the indices corresponding to the target categories in the NYU dataset.
@@ -657,3 +658,21 @@ def seed_everything(seed=42):
     torch.cuda.manual_seed_all(seed)
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
+
+
+def extract_layers(module: nn.Module):
+    """
+    Takes a nn.Module object and returns a list of all the submodules. Extracts the layers/submodules recursively.
+
+    :rtype: List of all layers in the passed module
+    """
+    layers = []
+    for name, submodule in module.named_children():
+        # If the submodule has children, recursively process them
+        if list(submodule.children()):
+            layers.extend(extract_layers(submodule))
+        else:
+            # Append as [name, submodule] for leaf modules
+            if not name == "leaky":
+                layers.append([name, submodule])
+    return layers

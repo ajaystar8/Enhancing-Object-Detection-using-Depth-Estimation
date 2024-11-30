@@ -2,6 +2,8 @@ import torch
 import torch.nn as nn
 from torchsummary import summary
 
+from utils import extract_layers
+
 """
 Tuple: (filters, kernel_size, stride) 
 List: ["B", number of repeats]
@@ -43,6 +45,9 @@ config = [
 class CNNBlock(nn.Module):
     def __init__(self, in_channels, out_channels, bn_act=True, **kwargs):
         super(CNNBlock, self).__init__()
+        self.out_channels = out_channels
+        self.kernel_size = kwargs.get("kernel_size")
+
         self.conv = nn.Conv2d(in_channels, out_channels, bias=not bn_act, **kwargs)
         self.bn = nn.BatchNorm2d(out_channels) if bn_act else None
         self.leaky = nn.LeakyReLU(0.1)
@@ -63,7 +68,7 @@ class ResidualBlock(nn.Module):
             self.layers.append(
                 nn.Sequential(
                     CNNBlock(channels, channels // 2, kernel_size=1),
-                    CNNBlock(channels // 2, channels,  kernel_size=3, padding=1)
+                    CNNBlock(channels // 2, channels, kernel_size=3, padding=1)
                 )
             )
         self.use_residual = use_residual
@@ -101,6 +106,19 @@ class YOLOv3(nn.Module):
         self.num_classes = num_classes
         self.in_channels = in_channels
         self.layers = self._create_conv_layers()
+
+    """
+    Loads weights for the backbone of yolov3. Backbone is till (not including) the conv layer: Conv2d(512, 1, 1)
+    """
+
+    def freeze_backbone_weights(self):
+        module_list = extract_layers(self)
+        for module_item in module_list:
+            name, module = module_item[0], module_item[1]
+            if name == "conv" and module.out_channels == 512 and module.kernel_size == 1:
+                break
+            for param in module.parameters():
+                param.requires_grad = False
 
     def forward(self, x):
         outputs = []
