@@ -6,7 +6,7 @@ from torchvision import transforms
 import config
 from load_weights import LoadYOLOWeights
 from model import YOLOv3
-from utils import cells_to_bboxes, plot_image
+from utils import *
 
 # Load weights
 config_file_path = "./weights/yolov3.cfg"
@@ -30,10 +30,15 @@ input_tensor = transform(image).unsqueeze(0)
 # Inference
 with torch.no_grad():
     outputs = model(input_tensor)
+    bboxes_all_scales = []
 
-    bboxes = cells_to_bboxes(outputs[2], np.array(config.ANCHORS[2]), 52, True)
-    print(len(bboxes[0]))
-    # plot_image(image, bboxes)
+    for i in range(len(outputs)):
+        S = outputs[i].shape[2]
+        bboxes = cells_to_bboxes(outputs[i], np.array(config.ANCHORS[i]), S, True)[0]
+        bboxes_all_scales.extend(bboxes)
+
+    nms_bboxes_all_scales = non_max_suppression(bboxes_all_scales, iou_threshold=1, threshold=0.7, box_format="corners")
+    plot_image(image, nms_bboxes_all_scales)
 
 
 
