@@ -33,8 +33,10 @@ data
 __*
 *.pth
 *.tar
+*.pkl
 weights
 NYUD_Utils/depth
 scratch_notebooks/
 resources/nyu_depth_v2_labeled.mat
 archives
+checkpoints

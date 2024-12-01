@@ -56,6 +56,7 @@ def main():
     loss_fn = YoloLoss()
 
     train_loader, test_loader, train_eval_loader = get_loaders_nyu(mat_file_path=config.NYU_PATH)
+    print(config.DEVICE)
 
     if config.LOAD_MODEL:
         load_checkpoint(
@@ -71,6 +72,7 @@ def main():
     best_map_till_now = -1
 
     print("Training started!")
+    save_checkpoint(model, optimizer, filename=f"initial_ckpt.pth.tar")
     for epoch in range(config.NUM_EPOCHS):
         print(f"--------[EPOCH-{epoch + 1}]-------------")
         train_fn(train_loader, model, optimizer, loss_fn, scaled_anchors)

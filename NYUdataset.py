@@ -1,7 +1,11 @@
+import os.path
+
 import numpy as np
 import torch
 from pymatreader import read_mat
 from torch.utils.data import Dataset, DataLoader
+import pickle
+import h5py
 
 import config
 from utils import (
@@ -26,25 +30,38 @@ class NYUYoloDataset(Dataset):
             transform (callable, optional): Transformations to apply to the images and labels.
             indices (list, optional): List of indices specifying the subset of the dataset to use.
         """
-        import h5py
 
-        with h5py.File(mat_file, "r") as f:
-            self.data = {key: np.array(f[key]) for key in f.keys()}
-            self.images = np.rot90(self.data["images"], k=-1, axes=(2, 3))  # (N, 3, H, W), Rotate HxW axes
-            self.instances = np.rot90(self.data["instances"], k=-1, axes=(1, 2))  # (N, H, W)
-            self.labels = np.rot90(self.data["labels"], k=-1, axes=(1, 2))  # (N, H, W)
-            # Use only the specified subset of data if indices are provided
+        if not os.path.exists('./resources/sub_nyu_mat.pkl'):
+            with h5py.File(mat_file, "r") as mat_file:
+                self.data = {key: np.array(mat_file[key]) for key in mat_file.keys()}
+                self.images = np.rot90(self.data["images"], k=-1, axes=(2, 3))  # (N, 3, H, W), Rotate HxW axes
+                self.instances = np.rot90(self.data["instances"], k=-1, axes=(1, 2))  # (N, H, W)
+                self.labels = np.rot90(self.data["labels"], k=-1, axes=(1, 2))  # (N, H, W)
+                sub_mat = {"images": self.data['images'], "instances": self.data['instances'],
+                           "labels": self.data['labels']}
+                with open('./resources/sub_nyu_mat.pkl', 'wb') as f:
+                    pickle.dump(sub_mat, f, protocol=pickle.HIGHEST_PROTOCOL)
+        else:
+            with open('./resources/sub_nyu_mat.pkl', 'rb') as f:
+                self.data = pickle.load(f)
+                self.images = np.rot90(self.data["images"], k=-1, axes=(2, 3))  # (N, 3, H, W), Rotate HxW axes
+                self.instances = np.rot90(self.data["instances"], k=-1, axes=(1, 2))  # (N, H, W)
+                self.labels = np.rot90(self.data["labels"], k=-1, axes=(1, 2))  # (N, H, W)
+
+        self.names = read_mat(mat_file, variable_names=['names'])
+
         if indices is not None:
             self.images = self.images[indices]
             self.instances = self.instances[indices]
             self.labels = self.labels[indices]
-        self.mat_file = mat_file
-        self.categories = read_mat(self.mat_file, variable_names=['names'])
+
         self.anchors = torch.tensor(anchors[0] + anchors[1] + anchors[2])
         self.num_anchors = self.anchors.shape[0]
         self.num_anchors_per_scale = self.num_anchors // 3
+
         self.ignore_iou_thresh = 0.5
         self.image_size = image_size
+
         self.S = S if S else [13, 26, 52]
         self.C = C
         self.transform = transform
