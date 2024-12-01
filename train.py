@@ -12,7 +12,6 @@ from utils import (
     save_checkpoint,
     load_checkpoint,
     check_class_accuracy,
-    get_loaders,
     get_loaders_nyu
 )
 
@@ -28,14 +27,7 @@ def train_fn(train_loader, model, optimizer, loss_fn, scaled_anchors):
             y[1].to(config.DEVICE),
             y[2].to(config.DEVICE)
         )
-        print(f"y[0]: {y[0].shape}")
-        print(f"y[1]: {y[1].shape}")
-        print(f"y[2]: {y[2].shape}")
-
         out = model(x)
-        print("Output shapes")
-        for item in out:
-            print(item.shape)
 
         loss = (
                 loss_fn(out[0], y0, scaled_anchors[0]) +
@@ -59,15 +51,11 @@ def main():
     model.freeze_backbone_weights()
 
     optimizer = optim.Adam(
-        model.parameters(), lr=config.LEARNING_RATE, weight_decay=config.WEIGHT_DECAY
+        filter(lambda p: p.requires_grad, model.parameters()), lr=config.LEARNING_RATE, weight_decay=config.WEIGHT_DECAY
     )
     loss_fn = YoloLoss()
 
-    train_loader, test_loader, train_eval_loader = get_loaders(
-        train_csv_path=config.DATASET + "/train.csv", test_csv_path=config.DATASET + "/test.csv"
-    ) if not config.DATASET == 'NYUv2' else get_loaders_nyu(
-        mat_file_path=config.NYU_PATH
-    )
+    train_loader, test_loader, train_eval_loader = get_loaders_nyu(mat_file_path=config.NYU_PATH)
 
     if config.LOAD_MODEL:
         load_checkpoint(
@@ -84,7 +72,7 @@ def main():
 
     print("Training started!")
     for epoch in range(config.NUM_EPOCHS):
-        print(f"--------[EPOCH-{epoch+1}]-------------")
+        print(f"--------[EPOCH-{epoch + 1}]-------------")
         train_fn(train_loader, model, optimizer, loss_fn, scaled_anchors)
 
         if best_map_till_now < 0:

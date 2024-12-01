@@ -113,10 +113,10 @@ class YOLOv3(nn.Module):
 
     def freeze_backbone_weights(self):
         module_list = extract_layers(self)
-        for module_item in module_list:
-            name, module = module_item[0], module_item[1]
-            if name == "conv" and module.out_channels == 512 and module.kernel_size == 1:
+        for idx, module_item in enumerate(module_list):
+            if idx == 62:
                 break
+            _, module = module_item[0], module_item[1]
             for param in module.parameters():
                 param.requires_grad = False
 
