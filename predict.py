@@ -12,9 +12,9 @@ from utils import *
 config_file_path = "./weights/yolov3.cfg"
 weights_file_path = "./weights/yolov3.weights"
 
-model = YOLOv3(num_classes=config.NUM_CLASSES).to(config.DEVICE)
-weight_loader = LoadYOLOWeights(config_file_path, weights_file_path)
-weight_loader.load(model)
+model = YOLOv3(num_classes=config.NUM_CLASSES)
+
+load_checkpoint(os.path.join(config.CHECKPOINT_DIR, "initial_ckpt.pth.tar"), model)
 
 # Switch to evaluation mode
 model.eval()

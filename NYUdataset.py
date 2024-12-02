@@ -1,14 +1,15 @@
 import os.path
+import pickle
 
+import h5py
 import numpy as np
 import torch
 from pymatreader import read_mat
 from torch.utils.data import Dataset, DataLoader
-import pickle
-import h5py
+from tqdm import tqdm
 
 import config
-from utils import (
+from utils.utils import (
     cells_to_bboxes,
     iou_width_height,
     non_max_suppression,
@@ -19,7 +20,7 @@ from utils import (
 
 class NYUYoloDataset(Dataset):
     def __init__(self, mat_file, anchors, image_size=416, S=None, C=40, transform=None, indices=None,
-                 use_only_target_categories=False):
+                 use_only_target_categories=False, generate_labels=False):
         """
         Args:
             mat_file (str): Path to the .mat file containing the dataset.
@@ -31,6 +32,7 @@ class NYUYoloDataset(Dataset):
             indices (list, optional): List of indices specifying the subset of the dataset to use.
         """
 
+        # Data loading
         if not os.path.exists('./resources/sub_nyu_mat.pkl'):
             with h5py.File(mat_file, "r") as mat_file:
                 self.data = {key: np.array(mat_file[key]) for key in mat_file.keys()}
@@ -48,6 +50,7 @@ class NYUYoloDataset(Dataset):
                 self.instances = np.rot90(self.data["instances"], k=-1, axes=(1, 2))  # (N, H, W)
                 self.labels = np.rot90(self.data["labels"], k=-1, axes=(1, 2))  # (N, H, W)
 
+        # Extracting categories of the dataset
         self.names = read_mat(mat_file, variable_names=['names'])
 
         if indices is not None:
@@ -66,6 +69,7 @@ class NYUYoloDataset(Dataset):
         self.C = C
         self.transform = transform
         self.use_only_target_categories = use_only_target_categories
+        self.generate_labels = generate_labels
 
     def __len__(self):
         return len(self.images)
@@ -88,6 +92,16 @@ class NYUYoloDataset(Dataset):
         bboxes = self._get_bounding_boxes(instance_map, label_map,
                                           get_nyu_target_category_indices()
                                           if self.use_only_target_categories else None)
+
+        if self.generate_labels:
+            # create label text files in YOLO format
+            np_bboxes = np.array(bboxes, dtype=np.float32)
+            # keep class label first
+            if np_bboxes.size != 0:
+                np_bboxes = np.roll(np_bboxes, 1, axis=1)
+                np.savetxt(os.path.join("..", "NYUD", "labels", f"{index}.txt"), np_bboxes, fmt='%d %f %f %f %f')
+            else:
+                np.savetxt(os.path.join("..", "NYUD", "labels", f"{index}.txt"), np_bboxes)
 
         # Apply transformations
         if self.transform:
@@ -121,23 +135,6 @@ class NYUYoloDataset(Dataset):
                     targets[scale_idx][anchor_on_scale, i, j, 0] = -1
 
         return image, tuple(targets)
-
-    def _map_ids_to_names(self):
-        ids_to_names = {}
-        namesToIds = {name: (n + 1) for n, name in enumerate(self.categories['names'])}
-        for key, value in namesToIds.items():
-            ids_to_names[value] = key
-        return ids_to_names
-
-    def _skip(self, class_label):
-        ids_to_names = self._map_ids_to_names()
-        if class_label == 0:
-            return True
-        class_label_str = ids_to_names[class_label]
-        if class_label_str not in config.NYU_TARGET_CATEGORIES:
-            return True
-        else:
-            return False
 
     @staticmethod
     def _get_instance_masks(img_object_labels, img_instances):
@@ -180,6 +177,7 @@ class NYUYoloDataset(Dataset):
         instance_masks, instance_labels = self._get_instance_masks(label_map, instance_map)
 
         bboxes = []
+        # print(instance_masks.shape[-1])
         for i in range(instance_masks.shape[-1]):
             mask = instance_masks[:, :, i]  # Binary mask for the current instance
             class_label = instance_labels[i] - 1  # Corresponding class label
@@ -187,11 +185,6 @@ class NYUYoloDataset(Dataset):
             # Skip the instance if the class label is not in the target indices
             if nyu_target_indices is not None and class_label not in nyu_target_indices:
                 continue
-            '''
-            # Skip the instance if the class label is not in the target categories
-            if self._skip(class_label):
-                continue
-            '''
 
             # Find the bounding box from the mask
             y, x = np.where(mask)  # Get mask coordinates
@@ -212,6 +205,7 @@ class NYUYoloDataset(Dataset):
 
             # Append the bounding box and class label
             # Convert the class label to the index in the target indices
+            # print(nyu_target_indices.index(class_label), x_center, y_center, width, height)
             bboxes.append([x_center, y_center, width, height,
                            nyu_target_indices.index(class_label) if self.use_only_target_categories else class_label])
 
@@ -219,7 +213,8 @@ class NYUYoloDataset(Dataset):
 
 
 def test():
-    anchors = config.ANCHORS
+    # anchors = config.ANCHORS
+    anchors = config.NYU_ANCHORS
     dataset = NYUYoloDataset(
         mat_file=config.NYU_PATH,
         image_size=416,
@@ -227,7 +222,8 @@ def test():
         S=[13, 26, 52],
         C=config.NYU_LABELS.__len__(),
         transform=config.train_transforms,
-        use_only_target_categories=True
+        use_only_target_categories=True,
+        generate_labels=True
     )
 
     S = [13, 26, 52]
@@ -243,7 +239,7 @@ def test():
         shuffle=True,
         drop_last=False,
     )
-    for x, y in loader:
+    for x, y in tqdm(loader):
         boxes = []
         for i in range(y[0].shape[1]):
             anchor = scaled_anchors[i]
@@ -253,6 +249,7 @@ def test():
         boxes = non_max_suppression(boxes, iou_threshold=1,
                                     threshold=0.7, box_format="midpoint")
         plot_image(x[0].permute(1, 2, 0).to("cpu"), boxes)
+        break
 
 
 if __name__ == "__main__":

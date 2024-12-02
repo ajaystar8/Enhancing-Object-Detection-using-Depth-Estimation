@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 
 from model import YOLOv3
-from utils import extract_layers
+from utils.utils import extract_layers
 
 
 class LoadYOLOWeights:

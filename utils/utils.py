@@ -431,26 +431,21 @@ def get_mean_std(loader):
 
 
 def save_checkpoint(model, optimizer, filename="my_checkpoint.pth.tar"):
-    os.makedirs("./checkpoints", exist_ok=True)
+    os.makedirs("../checkpoints", exist_ok=True)
 
     print("=> Saving checkpoint")
     checkpoint = {
         "state_dict": model.state_dict(),
         "optimizer": optimizer.state_dict(),
     }
-    torch.save(checkpoint, os.path.join(".", "checkpoints", filename))
+    torch.save(checkpoint, os.path.join("..", "checkpoints", filename))
 
 
-def load_checkpoint(checkpoint_file, model, optimizer, lr):
+def load_checkpoint(checkpoint_file, model):
     print("=> Loading checkpoint")
     checkpoint = torch.load(checkpoint_file, map_location=config.DEVICE)
     model.load_state_dict(checkpoint["state_dict"])
-    optimizer.load_state_dict(checkpoint["optimizer"])
-
-    # If we don't do this then it will just have learning rate of old checkpoint
-    # and it will lead to many hours of debugging \:
-    for param_group in optimizer.param_groups:
-        param_group["lr"] = lr
+    print("Checkpoint loaded successfully!")
 
 
 def plot_couple_examples(model, loader, thresh, iou_thresh, anchors):

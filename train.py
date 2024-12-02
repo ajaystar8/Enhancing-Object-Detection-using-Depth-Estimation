@@ -1,18 +1,20 @@
 import torch
 import torch.optim as optim
 from tqdm import tqdm
+import os
 
 import config
 from load_weights import LoadYOLOWeights
 from loss import YoloLoss
 from model import YOLOv3
-from utils import (
+from utils.utils import (
     mean_average_precision,
     get_evaluation_bboxes,
     save_checkpoint,
     load_checkpoint,
     check_class_accuracy,
-    get_loaders_nyu
+    get_loaders_nyu,
+    seed_everything
 )
 
 
@@ -46,25 +48,30 @@ def train_fn(train_loader, model, optimizer, loss_fn, scaled_anchors):
 
 def main():
     model = YOLOv3(num_classes=config.NUM_CLASSES).to(config.DEVICE)
+
+    # Load pretrained weights
     weight_loader = LoadYOLOWeights(config.CONFIG_FILE_PATH, config.WEIGHTS_FILE_PATH)
     weight_loader.load(model)
+
+    # Freeze weights
     model.freeze_backbone_weights()
 
     optimizer = optim.Adam(
-        filter(lambda p: p.requires_grad, model.parameters()), lr=config.LEARNING_RATE, weight_decay=config.WEIGHT_DECAY
+        model.parameters(), lr=config.LEARNING_RATE, weight_decay=config.WEIGHT_DECAY
     )
     loss_fn = YoloLoss()
 
     train_loader, test_loader, train_eval_loader = get_loaders_nyu(mat_file_path=config.NYU_PATH)
-    print(config.DEVICE)
 
+    config.LOAD_MODEL = False
     if config.LOAD_MODEL:
         load_checkpoint(
-            config.CHECKPOINT_FILE, model, optimizer, config.LEARNING_RATE
+            os.path.join(config.CHECKPOINT_DIR, "initial_ckpt.pth.tar"), model,
         )
 
     # Scale anchors to each prediction scale
     scaled_anchors = (
+            # torch.tensor(config.ANCHORS)
             torch.tensor(config.ANCHORS)
             * torch.tensor(config.S).unsqueeze(1).unsqueeze(1).repeat(1, 3, 2)
     ).to(config.DEVICE)
@@ -87,8 +94,10 @@ def main():
                 test_loader,
                 model,
                 iou_threshold=config.NMS_IOU_THRESH,
+                # anchors=config.ANCHORS,
                 anchors=config.ANCHORS,
                 threshold=config.CONF_THRESHOLD,
+                device=config.DEVICE
             )
             # Compute mean average precision 
             mapval = mean_average_precision(
@@ -107,4 +116,5 @@ def main():
 
 
 if __name__ == "__main__":
+    seed_everything()
     main()

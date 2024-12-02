@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from torchsummary import summary
 
-from utils import extract_layers
+from utils.utils import extract_layers
 
 """
 Tuple: (filters, kernel_size, stride) 
