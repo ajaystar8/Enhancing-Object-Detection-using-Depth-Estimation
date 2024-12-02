@@ -86,7 +86,7 @@ def main():
         if best_map_till_now < 0:
             save_checkpoint(model, optimizer, filename=f"initial_ckpt.pth.tar")
 
-        if epoch % 10 == 0 and epoch > 0:
+        if epoch % 1 == 0 and epoch > 0:
             print("On Test loader:")
             check_class_accuracy(model, test_loader, threshold=config.CONF_THRESHOLD)
             # Run model on test set and convert outputs to bounding boxes relative to image
