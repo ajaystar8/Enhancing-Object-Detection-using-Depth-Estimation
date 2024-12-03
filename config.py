@@ -5,10 +5,10 @@ import cv2
 import torch
 from albumentations.pytorch import ToTensorV2
 
-DATASET = 'NYUv2'
+DATASET = 'NYUD'
 DEVICE = "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu"
 
-NUM_WORKERS = 0  # For some reason, num_workers > 0 causes an error on my machine
+NUM_WORKERS = 0
 BATCH_SIZE = 8
 IMAGE_SIZE = 416
 
@@ -25,8 +25,10 @@ LOAD_MODEL = False
 SAVE_MODEL = False
 
 CHECKPOINT_DIR = os.path.join(os.getcwd(), "checkpoints")
-IMG_DIR = DATASET + "/images/"
-LABEL_DIR = DATASET + "/labels/"
+RGB_IMG_DIR = os.path.join(DATASET, "images")
+RGB_LABEL_DIR = os.path.join(DATASET, "labels")
+
+HHA_IMAGE_DIR = os.path.join(DATASET, "hha")
 NYU_PATH = "./resources/nyu_depth_v2_labeled.mat"
 
 # YOLOv3 specific

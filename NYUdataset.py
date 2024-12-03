@@ -1,9 +1,11 @@
 import os.path
 import pickle
+from glob import glob
 
 import h5py
 import numpy as np
 import torch
+from PIL import Image
 from pymatreader import read_mat
 from torch.utils.data import Dataset, DataLoader
 from tqdm import tqdm
@@ -19,8 +21,8 @@ from utils.utils import (
 
 
 class NYUYoloDataset(Dataset):
-    def __init__(self, mat_file, anchors, image_size=416, S=None, C=40, transform=None, indices=None,
-                 use_only_target_categories=False, generate_labels=False):
+    def __init__(self, mat_file, hha_dir, anchors, image_size=416, S=None, C=40, transform=None, indices=None,
+                 use_only_target_categories=False, generate_labels=False, rgb_train=False, hha_train=False):
         """
         Args:
             mat_file (str): Path to the .mat file containing the dataset.
@@ -33,28 +35,32 @@ class NYUYoloDataset(Dataset):
         """
 
         # Data loading
-        if not os.path.exists('./resources/sub_nyu_mat.pkl'):
-            with h5py.File(mat_file, "r") as mat_file:
-                self.data = {key: np.array(mat_file[key]) for key in mat_file.keys()}
+        if not os.path.exists('./resources/sub_nyu_hha_mat.pkl'):
+            with h5py.File(mat_file, "r") as f:
+                self.data = {key: np.array(f[key]) for key in f.keys()}
                 self.images = np.rot90(self.data["images"], k=-1, axes=(2, 3))  # (N, 3, H, W), Rotate HxW axes
                 self.instances = np.rot90(self.data["instances"], k=-1, axes=(1, 2))  # (N, H, W)
                 self.labels = np.rot90(self.data["labels"], k=-1, axes=(1, 2))  # (N, H, W)
+                self.names = np.array(read_mat(mat_file, variable_names=['names'])["names"])
+                hha_raw = self._get_hha_encoded_images(hha_dir)
+
+                self.hha = np.rot90(hha_raw, k=-1, axes=(2, 3))
                 sub_mat = {"images": self.data['images'], "instances": self.data['instances'],
-                           "labels": self.data['labels']}
-                with open('./resources/sub_nyu_mat.pkl', 'wb') as f:
-                    pickle.dump(sub_mat, f, protocol=pickle.HIGHEST_PROTOCOL)
+                           "labels": self.data['labels'], "names": self.names, "hha": hha_raw}
+                with open('./resources/sub_nyu_hha_mat.pkl', 'wb') as f1:
+                    pickle.dump(sub_mat, f1, protocol=pickle.HIGHEST_PROTOCOL)
         else:
-            with open('./resources/sub_nyu_mat.pkl', 'rb') as f:
+            with open('./resources/sub_nyu_hha_mat.pkl', 'rb') as f:
                 self.data = pickle.load(f)
                 self.images = np.rot90(self.data["images"], k=-1, axes=(2, 3))  # (N, 3, H, W), Rotate HxW axes
                 self.instances = np.rot90(self.data["instances"], k=-1, axes=(1, 2))  # (N, H, W)
                 self.labels = np.rot90(self.data["labels"], k=-1, axes=(1, 2))  # (N, H, W)
-
-        # Extracting categories of the dataset
-        self.names = read_mat(mat_file, variable_names=['names'])
+                self.hha = np.rot90(self.data['hha'], k=-1, axes=(2, 3))
+                self.names = self.data['names']
 
         if indices is not None:
             self.images = self.images[indices]
+            self.hha = self.hha[indices]
             self.instances = self.instances[indices]
             self.labels = self.labels[indices]
 
@@ -70,6 +76,8 @@ class NYUYoloDataset(Dataset):
         self.transform = transform
         self.use_only_target_categories = use_only_target_categories
         self.generate_labels = generate_labels
+        self.rgb_train = rgb_train
+        self.hha_train = hha_train
 
     def __len__(self):
         return len(self.images)
@@ -81,7 +89,16 @@ class NYUYoloDataset(Dataset):
             targets: List of tensors for each scale.
         """
         # Load image, instance map, and label map
-        image = self.images[index]  # (C, H, W)
+        image = None
+        if not self.rgb_train and not self.hha_train:
+            raise ValueError("Select atleast one train mode: RGB or HHA.")
+        if self.rgb_train and self.hha_train:
+            raise ValueError("Select one train mode: RGB or HHA.")
+        if self.rgb_train:
+            image = self.images[index]
+        elif self.hha_train:
+            image = self.hha[index]
+
         instance_map = self.instances[index]  # (H, W)
         label_map = self.labels[index]  # (H, W)
 
@@ -135,6 +152,16 @@ class NYUYoloDataset(Dataset):
                     targets[scale_idx][anchor_on_scale, i, j, 0] = -1
 
         return image, tuple(targets)
+
+    @staticmethod
+    def _get_hha_encoded_images(hha_images_path: str):
+        hha_image_paths = glob(os.path.join("..", hha_images_path, "*.png"))
+        hha_images = []
+        for path in hha_image_paths:
+            image = Image.open(path)
+            image = np.array(image).transpose(2, 1, 0)
+            hha_images.append(image)
+        return np.array(hha_images)
 
     @staticmethod
     def _get_instance_masks(img_object_labels, img_instances):

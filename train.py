@@ -63,7 +63,7 @@ def main():
 
     train_loader, test_loader, train_eval_loader = get_loaders_nyu(mat_file_path=config.NYU_PATH)
 
-    config.LOAD_MODEL = False
+    config.LOAD_MODEL = True
     if config.LOAD_MODEL:
         load_checkpoint(
             os.path.join(config.CHECKPOINT_DIR, "initial_ckpt.pth.tar"), model,
@@ -71,7 +71,6 @@ def main():
 
     # Scale anchors to each prediction scale
     scaled_anchors = (
-            # torch.tensor(config.ANCHORS)
             torch.tensor(config.ANCHORS)
             * torch.tensor(config.S).unsqueeze(1).unsqueeze(1).repeat(1, 3, 2)
     ).to(config.DEVICE)
@@ -86,7 +85,7 @@ def main():
         if best_map_till_now < 0:
             save_checkpoint(model, optimizer, filename=f"initial_ckpt.pth.tar")
 
-        if epoch % 1 == 0 and epoch > 0:
+        if epoch % 10 == 0 and epoch > 0:
             print("On Test loader:")
             check_class_accuracy(model, test_loader, threshold=config.CONF_THRESHOLD)
             # Run model on test set and convert outputs to bounding boxes relative to image
@@ -94,7 +93,6 @@ def main():
                 test_loader,
                 model,
                 iou_threshold=config.NMS_IOU_THRESH,
-                # anchors=config.ANCHORS,
                 anchors=config.ANCHORS,
                 threshold=config.CONF_THRESHOLD,
                 device=config.DEVICE
