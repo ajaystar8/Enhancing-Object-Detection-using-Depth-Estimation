@@ -105,6 +105,9 @@ def non_max_suppression(bboxes, iou_threshold, threshold, box_format="corners"):
     bboxes = sorted(bboxes, key=lambda x: x[1], reverse=True)
     bboxes_after_nms = []
 
+    print("threshold", threshold)
+    print("lengh of bboxes", len(bboxes))
+
     while bboxes:
         chosen_box = bboxes.pop(0)
 
@@ -300,7 +303,9 @@ def mean_average_precision(
         # torch.trapz for numerical integration
         average_precisions.append(torch.trapz(precisions, recalls))
 
-    return sum(average_precisions) / len(average_precisions)
+    map = sum(average_precisions) / len(average_precisions)
+
+    return map, average_precisions
 
 
 def plot_image(image, boxes):
@@ -472,10 +477,16 @@ def check_class_accuracy(model, loader, threshold):
             correct_noobj += torch.sum(obj_preds[noobj] == y[i][..., 0][noobj])
             tot_noobj += torch.sum(noobj)
 
-    print(f"Class accuracy is: {(correct_class / (tot_class_preds + 1e-16)) * 100:2f}%")
-    print(f"No obj accuracy is: {(correct_noobj / (tot_noobj + 1e-16)) * 100:2f}%")
-    print(f"Obj accuracy is: {(correct_obj / (tot_obj + 1e-16)) * 100:2f}%")
+    class_acc = correct_class / (tot_class_preds + 1e-16)
+    obj_acc = correct_obj / (tot_obj + 1e-16)
+    noobj_acc = correct_noobj / (tot_noobj + 1e-16)
+
+    print(f"Class accuracy is: {class_acc * 100:.2f}%")
+    print(f"No obj accuracy is: {noobj_acc * 100:2f}%")
+    print(f"Obj accuracy is: {obj_acc * 100:2f}%")
     model.train()
+
+    return class_acc, obj_acc, noobj_acc
 
 
 def get_mean_std(loader):
@@ -614,8 +625,8 @@ def get_loaders_nyu(mat_file_path, train_ratio=0.8):
         transform=config.train_transforms,
         indices=train_indices,
         use_only_target_categories=True,
-        rgb_train=False,
-        hha_train=True
+        rgb_train=True,
+        hha_train=False
     )
     test_dataset = NYUYoloDataset(
         mat_file=mat_file_path,
@@ -627,8 +638,8 @@ def get_loaders_nyu(mat_file_path, train_ratio=0.8):
         transform=config.test_transforms,
         indices=test_indices,
         use_only_target_categories=True,
-        rgb_train=False,
-        hha_train=True
+        rgb_train=True,
+        hha_train=False
     )
     train_eval_dataset = NYUYoloDataset(
         mat_file=mat_file_path,
@@ -640,8 +651,8 @@ def get_loaders_nyu(mat_file_path, train_ratio=0.8):
         transform=config.test_transforms,
         indices=train_indices,
         use_only_target_categories=True,
-        rgb_train=False,
-        hha_train=True
+        rgb_train=True,
+        hha_train=False
     )
 
     # Create DataLoaders
