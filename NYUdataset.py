@@ -241,7 +241,7 @@ class NYUYoloDataset(Dataset):
 
 def test():
     # anchors = config.ANCHORS
-    anchors = config.NYU_ANCHORS
+    anchors = config.ANCHORS
     dataset = NYUYoloDataset(
         mat_file=config.NYU_PATH,
         image_size=416,

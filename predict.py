@@ -6,7 +6,7 @@ from torchvision import transforms
 import config
 from load_weights import LoadYOLOWeights
 from model import YOLOv3
-from utils import *
+from utils.utils import *
 
 # Load weights
 config_file_path = "./weights/yolov3.cfg"

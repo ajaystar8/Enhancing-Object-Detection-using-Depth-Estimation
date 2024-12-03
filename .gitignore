@@ -40,6 +40,6 @@ scratch_notebooks/
 resources/nyu_depth_v2_labeled.mat
 archives
 checkpoints
-map.py
+archives/map.py
 notes
 

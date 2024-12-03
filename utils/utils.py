@@ -1,16 +1,16 @@
-import os
 import random
 from collections import Counter
 
 import matplotlib.patches as patches
 import matplotlib.pyplot as plt
 import numpy as np
-import torch
 import torch.nn as nn
 import torchvision
 from torch.utils.data import DataLoader
 from torchmetrics.detection.mean_ap import MeanAveragePrecision
 from tqdm import tqdm
+import os
+import torch
 
 import config
 
@@ -493,29 +493,43 @@ def get_mean_std(loader):
     return mean, std
 
 
-def save_checkpoint(model, optimizer, filename="my_checkpoint.pth.tar"):
-    os.makedirs("../checkpoints", exist_ok=True)
+def save_checkpoint(model, optimizer=None, filename="my_checkpoint.pth.tar", save_dir="checkpoints"):
+    """
+    Saves the model state and optionally the optimizer state to a checkpoint.
 
-    print("=> Saving checkpoint")
-    checkpoint = {
-        "state_dict": model.state_dict(),
-        "optimizer": optimizer.state_dict(),
-    }
-    torch.save(checkpoint, os.path.join("..", "checkpoints", filename))
+    Args:
+        model (torch.nn.Module): Model to save the state from.
+        optimizer (torch.optim.Optimizer, optional): Optimizer to save the state (default: None).
+        filename (str): Name of the checkpoint file (default: 'my_checkpoint.pth.tar').
+        save_dir (str): Directory to save the checkpoint file (default: '../checkpoints').
+    """
+    os.makedirs(os.path.join(".", save_dir), exist_ok=True)
+
+    print(f"=> Saving checkpoint to {os.path.join(save_dir, filename)}")
+    checkpoint = {"state_dict": model.state_dict()}
+    if optimizer:
+        checkpoint["optimizer"] = optimizer.state_dict()
+    torch.save(checkpoint, os.path.join(save_dir, filename))
+    print("Checkpoint saved successfully!")
 
 
-def load_checkpoint(checkpoint_file, model):
-    print("=> Loading checkpoint")
-    checkpoint = torch.load(checkpoint_file, map_location=config.DEVICE)
+def load_checkpoint(checkpoint_file, model, optimizer=None, device='cpu'):
+    """
+    Loads model state and optionally optimizer state from a checkpoint.
+
+    Args:
+        checkpoint_file (str): Path to the checkpoint file.
+        model (torch.nn.Module): Model to load the state into.
+        optimizer (torch.optim.Optimizer, optional): Optimizer to restore the state (default: None).
+        device (str): Device to map the checkpoint (default: 'cpu').
+    """
+    print(f"=> Loading checkpoint from {checkpoint_file}")
+    checkpoint = torch.load(checkpoint_file, map_location=device, weights_only=True)
     model.load_state_dict(checkpoint["state_dict"])
+    if optimizer and "optimizer" in checkpoint:
+        optimizer.load_state_dict(checkpoint["optimizer"])
+        print("=> Optimizer state restored")
     print("Checkpoint loaded successfully!")
-
-
-def load_checkpoint_and_train_state(checkpoint_file, model, optimizer):
-    print("=> Loading checkpoint and restoring training state")
-    checkpoint = torch.load(checkpoint_file, map_location=config.DEVICE)
-    model.load_state_dict(checkpoint["state_dict"])
-    optimizer.load_state_dict(checkpoint["optimizer"])
 
 
 def plot_couple_examples(model, loader, thresh, iou_thresh, anchors):
