@@ -1,8 +1,9 @@
+import json
+import os
+
 import torch
 import torch.optim as optim
 from tqdm import tqdm
-import os
-import json
 
 import config
 from load_weights import LoadYOLOWeights
@@ -17,6 +18,8 @@ from utils.utils import (
     get_loaders_nyu,
     seed_everything
 )
+
+config.LOAD_MODEL = False
 
 
 def train_fn(train_loader, model, optimizer, loss_fn, scaled_anchors):
@@ -62,11 +65,12 @@ def main():
     optimizer = optim.Adam(
         model.parameters(), lr=config.LEARNING_RATE, weight_decay=config.WEIGHT_DECAY
     )
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=50)
+
     loss_fn = YoloLoss()
 
     train_loader, test_loader, train_eval_loader = get_loaders_nyu(mat_file_path=config.NYU_PATH)
 
-    config.LOAD_MODEL = True
     if config.LOAD_MODEL:
         load_checkpoint(
             os.path.join(config.CHECKPOINT_DIR, "initial_ckpt.pth.tar"), model, optimizer
@@ -79,10 +83,10 @@ def main():
     ).to(config.DEVICE)
 
     best_map_till_now = -1
-    training_history = {"loss": [], "class_acc": [], "obj_acc": [], "noobj_acc": [], "map": [], "ap_per_class": []}
+    training_history = {"loss": [], "class_acc": [], "obj_acc": [], "noobj_acc": [], "map": [],
+                        "ap_per_class": [], "predicted_boxes": []}
 
     print("Training started!")
-    save_checkpoint(model, optimizer, filename="initial_ckpt.pth.tar", save_dir="checkpoints")
 
     # Define the subfolder for saving the training history
     subfolder = os.path.join("training_logs")
@@ -92,16 +96,18 @@ def main():
         print(f"--------[EPOCH-{epoch + 1}]-------------")
         epoch_loss = train_fn(train_loader, model, optimizer, loss_fn, scaled_anchors)
         training_history["loss"].append(epoch_loss)
+        scheduler.step()
 
         if best_map_till_now < 0:
             save_checkpoint(model, optimizer, filename=f"initial_ckpt.pth.tar")
 
-        if epoch % 10 == 0 and epoch > 0:
-            print("On Test loader:")
-            class_acc, obj_acc, noobj_acc = check_class_accuracy(model, test_loader, threshold=config.CONF_THRESHOLD)
-            training_history["class_acc"].append(class_acc.item())
-            training_history["obj_acc"].append(obj_acc.item())
-            training_history["noobj_acc"].append(noobj_acc.item())
+        print("On Test loader:")
+        class_acc, obj_acc, noobj_acc = check_class_accuracy(model, test_loader, threshold=config.CONF_THRESHOLD)
+        training_history["class_acc"].append({f"Epoch-{epoch + 1}": class_acc.item()})
+        training_history["obj_acc"].append({f"Epoch-{epoch + 1}": obj_acc.item()})
+        training_history["noobj_acc"].append({f"Epoch-{epoch + 1}": noobj_acc.item()})
+
+        if epoch >= 10:
             # Run model on test set and convert outputs to bounding boxes relative to image
             pred_boxes, true_boxes = get_evaluation_bboxes(
                 test_loader,
@@ -111,7 +117,8 @@ def main():
                 threshold=config.CONF_THRESHOLD,
                 device=config.DEVICE
             )
-            # Compute mean average precision 
+            training_history["predicted_boxes"].append({f"Epoch-{epoch + 1}": len(pred_boxes)})
+            # Compute mean average precision
             mapval, ap_per_class = mean_average_precision(
                 pred_boxes,
                 true_boxes,
@@ -119,8 +126,8 @@ def main():
                 box_format="midpoint",
                 num_classes=config.NUM_CLASSES,
             )
-            training_history["map"].append(mapval.item())
-            training_history["ap_per_class"].append([ap.item() for ap in ap_per_class])
+            training_history["map"].append({f"Epoch-{epoch + 1}": mapval.item()})
+            training_history["ap_per_class"].append({f"Epoch-{epoch + 1}": [ap.item() for ap in ap_per_class]})
             if mapval > best_map_till_now:
                 print(
                     "Model performance improved from {:.2f}% to {:.2f}%!".format(best_map_till_now * 100, mapval * 100))
@@ -129,16 +136,14 @@ def main():
             print(f"MAP: {mapval.item()}")
         else:
             # Append None to history if no evaluation is done
-            training_history["class_acc"].append(None)
-            training_history["obj_acc"].append(None)
-            training_history["noobj_acc"].append(None)
-            training_history["map"].append(None)
-            training_history["average_precisions"].append(None)
+            training_history["map"].append({f"Epoch-{epoch + 1}": None})
+            training_history["ap_per_class"].append({f"Epoch-{epoch + 1}": None})
 
         # Save the training history to a file
         history_file_path = os.path.join(subfolder, "training_history.json")
         with open(history_file_path, "w") as f:
             json.dump(training_history, f)
+
 
 if __name__ == "__main__":
     seed_everything()

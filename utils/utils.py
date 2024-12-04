@@ -1,16 +1,16 @@
+import os
 import random
 from collections import Counter
 
 import matplotlib.patches as patches
 import matplotlib.pyplot as plt
 import numpy as np
+import torch
 import torch.nn as nn
 import torchvision
 from torch.utils.data import DataLoader
 from torchmetrics.detection.mean_ap import MeanAveragePrecision
 from tqdm import tqdm
-import os
-import torch
 
 import config
 
@@ -301,11 +301,14 @@ def mean_average_precision(
         precisions = torch.cat((torch.tensor([1]), precisions))
         recalls = torch.cat((torch.tensor([0]), recalls))
         # torch.trapz for numerical integration
-        average_precisions.append(torch.trapz(precisions, recalls))
+        average_precisions.append({f"{config.NYU_TARGET_CATEGORIES[c]}": torch.trapz(precisions, recalls)})
 
-    map = sum(average_precisions) / len(average_precisions)
+    sum_average_precision = 0.0
+    for item in average_precisions:
+        sum_average_precision += list(item.values())[0]
+    map_score = sum_average_precision / len(average_precisions)
 
-    return map, average_precisions
+    return map_score, average_precisions
 
 
 def plot_image(image, boxes):
@@ -504,7 +507,7 @@ def get_mean_std(loader):
     return mean, std
 
 
-def save_checkpoint(model, optimizer=None, filename="my_checkpoint.pth.tar", save_dir="checkpoints"):
+def save_checkpoint(model, learning_rate, optimizer=None, filename="my_checkpoint.pth.tar", save_dir="checkpoints"):
     """
     Saves the model state and optionally the optimizer state to a checkpoint.
 
@@ -517,7 +520,7 @@ def save_checkpoint(model, optimizer=None, filename="my_checkpoint.pth.tar", sav
     os.makedirs(os.path.join(".", save_dir), exist_ok=True)
 
     print(f"=> Saving checkpoint to {os.path.join(save_dir, filename)}")
-    checkpoint = {"state_dict": model.state_dict()}
+    checkpoint = {"state_dict": model.state_dict(), 'learning_rate': learning_rate}
     if optimizer:
         checkpoint["optimizer"] = optimizer.state_dict()
     torch.save(checkpoint, os.path.join(save_dir, filename))
