@@ -105,9 +105,6 @@ def non_max_suppression(bboxes, iou_threshold, threshold, box_format="corners"):
     bboxes = sorted(bboxes, key=lambda x: x[1], reverse=True)
     bboxes_after_nms = []
 
-    print("threshold", threshold)
-    print("lengh of bboxes", len(bboxes))
-
     while bboxes:
         chosen_box = bboxes.pop(0)
 
@@ -301,7 +298,8 @@ def mean_average_precision(
         precisions = torch.cat((torch.tensor([1]), precisions))
         recalls = torch.cat((torch.tensor([0]), recalls))
         # torch.trapz for numerical integration
-        average_precisions.append({f"{config.NYU_TARGET_CATEGORIES[c]}": torch.trapz(precisions, recalls)})
+        average_precisions.append({f"{config.NYU_TARGET_CATEGORIES[c]}":
+                                       float(torch.trapz(precisions, recalls).item())})
 
     sum_average_precision = 0.0
     for item in average_precisions:
@@ -538,7 +536,7 @@ def load_checkpoint(checkpoint_file, model, optimizer=None, device='cpu'):
         device (str): Device to map the checkpoint (default: 'cpu').
     """
     print(f"=> Loading checkpoint from {checkpoint_file}")
-    checkpoint = torch.load(checkpoint_file, map_location=device, weights_only=True)
+    checkpoint = torch.load(checkpoint_file, map_location=device, weights_only=False)
     model.load_state_dict(checkpoint["state_dict"])
     if optimizer and "optimizer" in checkpoint:
         optimizer.load_state_dict(checkpoint["optimizer"])
@@ -654,8 +652,8 @@ def get_loaders_nyu(mat_file_path, train_ratio=0.8):
         transform=config.test_transforms,
         indices=train_indices,
         use_only_target_categories=True,
-        rgb_train=True,
-        hha_train=False
+        rgb_train=False,
+        hha_train=True
     )
 
     # Create DataLoaders
