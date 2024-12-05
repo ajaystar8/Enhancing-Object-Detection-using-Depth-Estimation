@@ -19,8 +19,6 @@ from utils.utils import (
     seed_everything
 )
 
-config.LOAD_MODEL = True
-
 
 def train_fn(train_loader, model, optimizer, loss_fn, scaled_anchors):
     loop = tqdm(train_loader, leave=True)
@@ -69,11 +67,12 @@ def main():
 
     loss_fn = YoloLoss()
 
-    train_loader, test_loader, train_eval_loader = get_loaders_nyu(mat_file_path=config.NYU_PATH)
+    train_mode = str(input("Enter train mode (rgb or hha or fusion): "))
+    train_loader, test_loader, train_eval_loader = get_loaders_nyu(mat_file_path=config.NYU_PATH, train_mode=train_mode)
 
     if config.LOAD_MODEL:
         load_checkpoint(
-            os.path.join(config.CHECKPOINT_DIR, "hha1_ckpt.pth.tar"), model, optimizer
+            os.path.join(config.CHECKPOINT_DIR, "rgb_1_resume_ckpt.pth.tar"), model, optimizer
         )
 
     # Scale anchors to each prediction scale
@@ -148,5 +147,6 @@ def main():
 
 
 if __name__ == "__main__":
+    config.LOAD_MODEL = True
     seed_everything()
     main()

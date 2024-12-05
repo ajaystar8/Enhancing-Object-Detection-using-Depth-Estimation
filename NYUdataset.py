@@ -22,7 +22,7 @@ from utils.utils import (
 
 class NYUYoloDataset(Dataset):
     def __init__(self, mat_file, hha_dir, anchors, image_size=416, S=None, C=40, transform=None, indices=None,
-                 use_only_target_categories=False, generate_labels=False, rgb_train=False, hha_train=False):
+                 use_only_target_categories=False, generate_labels=False, train_mode="rgb"):
         """
         Args:
             mat_file (str): Path to the .mat file containing the dataset.
@@ -76,8 +76,7 @@ class NYUYoloDataset(Dataset):
         self.transform = transform
         self.use_only_target_categories = use_only_target_categories
         self.generate_labels = generate_labels
-        self.rgb_train = rgb_train
-        self.hha_train = hha_train
+        self.train_mode = train_mode.strip().lower()
 
     def __len__(self):
         return len(self.images)
@@ -90,14 +89,14 @@ class NYUYoloDataset(Dataset):
         """
         # Load image, instance map, and label map
         image = None
-        if not self.rgb_train and not self.hha_train:
-            raise ValueError("Select atleast one train mode: RGB or HHA.")
-        if self.rgb_train and self.hha_train:
-            raise ValueError("Select one train mode: RGB or HHA.")
-        if self.rgb_train:
+        if self.train_mode == "rgb":
             image = self.images[index]
-        elif self.hha_train:
+        elif self.train_mode == "hha":
             image = self.hha[index]
+        elif self.train_mode == "fusion":
+            image = torch.stack([self.images[index], self.hha[index]])
+        else:
+            raise NotImplementedError
 
         instance_map = self.instances[index]  # (H, W)
         label_map = self.labels[index]  # (H, W)

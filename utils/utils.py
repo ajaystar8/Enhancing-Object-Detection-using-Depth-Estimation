@@ -1,5 +1,7 @@
+import glob
 import os
 import random
+import time
 from collections import Counter
 
 import matplotlib.patches as patches
@@ -591,12 +593,13 @@ def generate_train_test_indices(num_samples, train_ratio=0.8):
     return train_indices, test_indices
 
 
-def get_loaders_nyu(mat_file_path, train_ratio=0.8):
+def get_loaders_nyu(mat_file_path, train_mode, train_ratio=0.8):
     """
     Creates data loaders for the NYU Depth Dataset with a train-test split.
 
     Args:
         mat_file_path (str): Path to the .mat file containing the NYU dataset.
+        train_mode: if the model is to be trained on rgb data, hha data or both(fusion)
         train_ratio (float): Proportion of the dataset to use for training.
 
     Returns:
@@ -604,13 +607,12 @@ def get_loaders_nyu(mat_file_path, train_ratio=0.8):
         test_loader (DataLoader): DataLoader for testing data.
         train_eval_loader (DataLoader): DataLoader for evaluating training data.
     """
+    from NYUdataset import NYUYoloDataset
+
     # Load the number of samples in the dataset
     import h5py
     with h5py.File(mat_file_path, "r") as f:
         num_samples = len(f["images"])
-
-    # Import the necessary classes and functions
-    from NYUdataset import NYUYoloDataset
 
     # Generate train and test indices
     train_indices, test_indices = generate_train_test_indices(num_samples, train_ratio)
@@ -626,8 +628,7 @@ def get_loaders_nyu(mat_file_path, train_ratio=0.8):
         transform=config.train_transforms,
         indices=train_indices,
         use_only_target_categories=True,
-        rgb_train=True,
-        hha_train=False
+        train_mode=train_mode
     )
     test_dataset = NYUYoloDataset(
         mat_file=mat_file_path,
@@ -639,8 +640,7 @@ def get_loaders_nyu(mat_file_path, train_ratio=0.8):
         transform=config.test_transforms,
         indices=test_indices,
         use_only_target_categories=True,
-        rgb_train=True,
-        hha_train=False
+        train_mode=train_mode
     )
     train_eval_dataset = NYUYoloDataset(
         mat_file=mat_file_path,
@@ -652,8 +652,7 @@ def get_loaders_nyu(mat_file_path, train_ratio=0.8):
         transform=config.test_transforms,
         indices=train_indices,
         use_only_target_categories=True,
-        rgb_train=False,
-        hha_train=True
+        train_mode=train_mode
     )
 
     # Create DataLoaders
