@@ -29,6 +29,7 @@ config = [
     # To this point is Darknet-53
     (512, 1, 1),
     # resnet concat -> out-shape = in-shape -> No changes required
+    "C",
     (1024, 3, 1),
     "S",
     (256, 1, 1),
@@ -112,9 +113,9 @@ class ScalePrediction(nn.Module):
         )
 
 
-class YOLOv3(nn.Module):
+class ResYOLOv3(nn.Module):
     def __init__(self, in_channels=3, num_classes=20):
-        super(YOLOv3, self).__init__()
+        super(ResYOLOv3, self).__init__()
         self.num_classes = num_classes
         self.in_channels = in_channels
         self.layers = self._create_conv_layers()
@@ -132,13 +133,17 @@ class YOLOv3(nn.Module):
             for param in module.parameters():
                 param.requires_grad = False
 
-    def forward(self, x):
+    def forward(self, x, hha):
         outputs = []
         route_connections = []
 
         for layer in self.layers:
             if isinstance(layer, ScalePrediction):
                 outputs.append(layer(x))
+                continue
+
+            elif isinstance(layer, ResnetBlock):
+                x = x + layer(hha)
                 continue
 
             x = layer(x)
@@ -183,19 +188,23 @@ class YOLOv3(nn.Module):
                     layers.append(nn.Upsample(scale_factor=2, mode='bilinear'))
                     in_channels = in_channels * 3
 
+                elif module == "C":
+                    layers.append(ResnetBlock())
+
         return layers
 
 
 def test():
-    num_classes = 80
-    model = YOLOv3(num_classes=num_classes)
-    img_size = 608
+    num_classes = 19
+    model = ResYOLOv3(num_classes=19)
+    img_size = 416
     x = torch.randn((2, 3, img_size, img_size))
-    out = model(x)
+    hha = torch.randn((2, 3, img_size, img_size))
+    out = model(x, hha)
     assert out[0].shape == (2, 3, img_size // 32, img_size // 32, 5 + num_classes)
     assert out[1].shape == (2, 3, img_size // 16, img_size // 16, 5 + num_classes)
     assert out[2].shape == (2, 3, img_size // 8, img_size // 8, 5 + num_classes)
-    summary(model, (3, 608, 608))
+    summary(model, [(3, 608, 608), (3, 608, 608)])
     print("Success!")
 
 

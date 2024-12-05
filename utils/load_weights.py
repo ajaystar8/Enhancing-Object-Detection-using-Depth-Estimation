@@ -2,7 +2,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from model import YOLOv3
+from models.yolov3 import YOLOv3
 from utils.utils import extract_layers
 
 
@@ -116,7 +116,7 @@ class LoadYOLOWeights:
                 bn_running_mean = bn_running_mean.view_as(bn.running_mean)
                 bn_running_var = bn_running_var.view_as(bn.running_var)
 
-                # Copy the data to model
+                # Copy the PASCAL to model
                 bn.bias.data.copy_(bn_biases)
                 bn.weight.data.copy_(bn_weights)
                 bn.running_mean.copy_(bn_running_mean)
@@ -133,7 +133,7 @@ class LoadYOLOWeights:
                 # reshape the loaded weights according to the dims of the model weights
                 conv_biases = conv_biases.view_as(conv.bias.data)
 
-                # Finally copy the data
+                # Finally copy the PASCAL
                 conv.bias.data.copy_(conv_biases)
 
             # Let us load the weights for the Convolutional layers
@@ -154,8 +154,8 @@ class LoadYOLOWeights:
 
 if __name__ == "__main__":
     num_classes = 19
-    config_file_path = "./weights/yolov3.cfg"
-    weights_file_path = "./weights/yolov3.weights"
+    config_file_path = "../weights/yolov3.cfg"
+    weights_file_path = "../weights/yolov3.weights"
 
     model = YOLOv3(num_classes=num_classes)
     # summary(model, (3, 416, 416))

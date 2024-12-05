@@ -36,7 +36,7 @@ class NYUYoloDataset(Dataset):
         """
 
         # Data loading
-        if not os.path.exists('./resources/sub_nyu_hha_mat.pkl'):
+        if not os.path.exists('resources/sub_nyu_hha_mat.pkl'):
             with h5py.File(mat_file, "r") as f:
                 self.data = {key: np.array(f[key]) for key in f.keys()}
                 self.images = np.rot90(self.data["images"], k=-1, axes=(2, 3))  # (N, 3, H, W), Rotate HxW axes
@@ -48,10 +48,10 @@ class NYUYoloDataset(Dataset):
                 self.hha = np.rot90(hha_raw, k=-1, axes=(2, 3))
                 sub_mat = {"images": self.data['images'], "instances": self.data['instances'],
                            "labels": self.data['labels'], "names": self.names, "hha": hha_raw}
-                with open('./resources/sub_nyu_hha_mat.pkl', 'wb') as f1:
+                with open('../resources/sub_nyu_hha_mat.pkl', 'wb') as f1:
                     pickle.dump(sub_mat, f1, protocol=pickle.HIGHEST_PROTOCOL)
         else:
-            with open('./resources/sub_nyu_hha_mat.pkl', 'rb') as f:
+            with open('resources/sub_nyu_hha_mat.pkl', 'rb') as f:
                 self.data = pickle.load(f)
                 self.images = np.rot90(self.data["images"], k=-1, axes=(2, 3))  # (N, 3, H, W), Rotate HxW axes
                 self.instances = np.rot90(self.data["instances"], k=-1, axes=(1, 2))  # (N, H, W)
@@ -119,9 +119,9 @@ class NYUYoloDataset(Dataset):
             # keep class label first
             if np_bboxes.size != 0:
                 np_bboxes = np.roll(np_bboxes, 1, axis=1)
-                np.savetxt(os.path.join("..", "NYUD", "labels", f"{index}.txt"), np_bboxes, fmt='%d %f %f %f %f')
+                np.savetxt(os.path.join("NYUD", "labels", f"{index}.txt"), np_bboxes, fmt='%d %f %f %f %f')
             else:
-                np.savetxt(os.path.join("..", "NYUD", "labels", f"{index}.txt"), np_bboxes)
+                np.savetxt(os.path.join("NYUD", "labels", f"{index}.txt"), np_bboxes)
 
         # Apply transformations
         if self.apply_transforms:
@@ -167,7 +167,7 @@ class NYUYoloDataset(Dataset):
 
     @staticmethod
     def _get_hha_encoded_images(hha_images_path: str):
-        hha_image_paths = glob(os.path.join("..", hha_images_path, "*.png"))
+        hha_image_paths = glob(os.path.join("../..", hha_images_path, "*.png"))
         hha_images = []
         for path in hha_image_paths:
             image = Image.open(path)

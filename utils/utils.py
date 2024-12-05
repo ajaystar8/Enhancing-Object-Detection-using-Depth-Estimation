@@ -1,7 +1,5 @@
-import glob
 import os
 import random
-import time
 from collections import Counter
 
 import matplotlib.patches as patches
@@ -595,20 +593,20 @@ def generate_train_test_indices(num_samples, train_ratio=0.8):
 
 def get_loaders_nyu(mat_file_path, train_mode, train_ratio=0.8):
     """
-    Creates data loaders for the NYU Depth Dataset with a train-test split.
+    Creates PASCAL loaders for the NYU Depth Dataset with a train-test split.
 
     Args:
         mat_file_path (str): Path to the .mat file containing the NYU dataset.
-        train_mode: if the model is to be trained on rgb data, hha data or both(fusion)
+        train_mode: if the model is to be trained on rgb PASCAL, hha PASCAL or both(fusion)
         train_ratio (float): Proportion of the dataset to use for training.
 
     Returns:
-        train_loader (DataLoader): DataLoader for training data.
-        test_loader (DataLoader): DataLoader for testing data.
-        train_eval_loader (DataLoader): DataLoader for evaluating training data.
+        train_loader (DataLoader): DataLoader for training PASCAL.
+        test_loader (DataLoader): DataLoader for testing PASCAL.
+        train_eval_loader (DataLoader): DataLoader for evaluating training PASCAL.
     """
-    from NYUdataset import NYUYoloDataset
-    from transforms import get_train_test_transforms_list
+    from data.NYUdataset import NYUYoloDataset
+    from utils.transforms import get_train_test_transforms_list
 
     # Load the number of samples in the dataset
     import h5py
@@ -710,6 +708,8 @@ def extract_layers(module: nn.Module):
 
     :rtype: List of all layers in the passed module
     """
+    from models import resyolov3
+
     layers = []
     for name, submodule in module.named_children():
         # If the submodule has children, recursively process them
@@ -717,6 +717,6 @@ def extract_layers(module: nn.Module):
             layers.extend(extract_layers(submodule))
         else:
             # Append as [name, submodule] for leaf modules
-            if not name == "leaky":
+            if name != "leaky" and not isinstance(submodule, resyolov3.ResnetBlock):
                 layers.append([name, submodule])
     return layers

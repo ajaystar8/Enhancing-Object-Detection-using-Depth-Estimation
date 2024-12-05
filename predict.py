@@ -1,11 +1,7 @@
-import numpy as np
-import torch
 from PIL import Image
 from torchvision import transforms
 
-import config
-from load_weights import LoadYOLOWeights
-from model import YOLOv3
+from models.yolov3 import YOLOv3
 from utils.utils import *
 
 # Load weights

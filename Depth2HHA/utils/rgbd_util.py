@@ -84,7 +84,7 @@ def getPointCloudFromZ(Z, C, s=1):
   
 Input:
     depthImage: in meters
-    missingMask:  boolean mask of what data was missing
+    missingMask:  boolean mask of what PASCAL was missing
     R: radius of clipping
     sc: to upsample or not
     superpixels:  superpixel map to define bounadaries that should

@@ -29,7 +29,7 @@ replay_pid*
 *.idea
 out
 *.bkp
-data
+PASCAL
 __*
 *.pth
 *.tar
@@ -42,3 +42,6 @@ archives
 checkpoints
 archives/map.py
 notes
+PASCAL
+NYUD
+NYUD_Utils

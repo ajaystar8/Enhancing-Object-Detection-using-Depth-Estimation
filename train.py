@@ -6,9 +6,10 @@ import torch.optim as optim
 from tqdm import tqdm
 
 import config
-from load_weights import LoadYOLOWeights
 from loss import YoloLoss
-from model import YOLOv3
+from models.resyolov3 import ResYOLOv3
+from models.yolov3 import YOLOv3
+from utils.load_weights import LoadYOLOWeights
 from utils.utils import (
     mean_average_precision,
     get_evaluation_bboxes,
@@ -29,13 +30,16 @@ def train_fn(train_loader, model, optimizer, loss_fn, scaled_anchors):
         image = image.to(config.DEVICE)
         if depth is not None:
             depth = depth.to(config.DEVICE)
-            
+
         y0, y1, y2 = (
             y[0].to(config.DEVICE),
             y[1].to(config.DEVICE),
             y[2].to(config.DEVICE)
         )
-        out = model(image)
+        if isinstance(model, ResYOLOv3):
+            out = model(image, depth)
+        else:
+            out = model(image)
 
         loss = (
                 loss_fn(out[0], y0, scaled_anchors[0]) +
@@ -55,14 +59,20 @@ def train_fn(train_loader, model, optimizer, loss_fn, scaled_anchors):
 
 
 def main():
-    model = YOLOv3(num_classes=config.NUM_CLASSES).to(config.DEVICE)
+    model_type = str(input("Enter model type to train (yolov3 or resyolov3): "))
 
-    # Load pretrained weights
-    weight_loader = LoadYOLOWeights(config.CONFIG_FILE_PATH, config.WEIGHTS_FILE_PATH)
-    weight_loader.load(model)
+    if model_type == "resyolov3":
+        model = ResYOLOv3(num_classes=config.NUM_CLASSES).to(config.DEVICE)
 
-    # Freeze weights
-    # model.freeze_backbone_weights()
+    else:
+        model = YOLOv3(num_classes=config.NUM_CLASSES).to(config.DEVICE)
+
+        # Load pretrained weights
+        weight_loader = LoadYOLOWeights(config.CONFIG_FILE_PATH, config.WEIGHTS_FILE_PATH)
+        weight_loader.load(model)
+
+        # Freeze weights
+        # model.freeze_backbone_weights()
 
     optimizer = optim.Adam(
         model.parameters(), lr=config.LEARNING_RATE, weight_decay=config.WEIGHT_DECAY
@@ -88,7 +98,7 @@ def main():
     best_map_till_now = -1
     training_history = {"loss": [], "class_acc": [], "obj_acc": [], "noobj_acc": [], "map": [],
                         "ap_per_class": [], "predicted_boxes": []}
-    train_log_file_name = str(input("Enter filename to store training logs: "))
+    train_log_file_name = str(input("Enter filename to store training logs (include .json): "))
     model_ckpt_name = str(input("Enter model checkpoint name (include .pth.tar): "))
 
     print("Training started!")
@@ -151,6 +161,6 @@ def main():
 
 
 if __name__ == "__main__":
-    config.LOAD_MODEL = True
+    config.LOAD_MODEL = False
     seed_everything()
     main()
