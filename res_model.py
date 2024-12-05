@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 from torchsummary import summary
+from torchvision.models import ResNet18_Weights, resnet18
 
 from utils.utils import extract_layers
 
@@ -41,6 +42,16 @@ config = [
     (256, 3, 1),
     "S",
 ]
+
+
+class ResnetBlock(nn.Module):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        resnet = resnet18(weights=ResNet18_Weights.DEFAULT)
+        self.resnet_backbone = torch.nn.Sequential(*list(resnet.children())[:-2])
+
+    def forward(self, x):
+        return self.resnet_backbone(x)
 
 
 class CNNBlock(nn.Module):

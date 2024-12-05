@@ -11,6 +11,7 @@ from torch.utils.data import Dataset, DataLoader
 from tqdm import tqdm
 
 import config
+from utils.transforms import get_train_test_transforms_list
 from utils.utils import (
     cells_to_bboxes,
     iou_width_height,
@@ -21,7 +22,7 @@ from utils.utils import (
 
 
 class NYUYoloDataset(Dataset):
-    def __init__(self, mat_file, hha_dir, anchors, image_size=416, S=None, C=40, transform=None, indices=None,
+    def __init__(self, mat_file, hha_dir, anchors, image_size=416, S=None, C=40, apply_transforms=True, indices=None,
                  use_only_target_categories=False, generate_labels=False, train_mode="rgb"):
         """
         Args:
@@ -30,7 +31,7 @@ class NYUYoloDataset(Dataset):
             image_size (int): Size to which images will be resized.
             S (list): List of scales (e.g., [13, 26, 52] for YOLOv3).
             C (int): Number of classes in the dataset.
-            transform (callable, optional): Transformations to apply to the images and labels.
+            transform_list (callable, optional): Transformations to apply to the images and labels.
             indices (list, optional): List of indices specifying the subset of the dataset to use.
         """
 
@@ -73,7 +74,7 @@ class NYUYoloDataset(Dataset):
 
         self.S = S if S else [13, 26, 52]
         self.C = C
-        self.transform = transform
+        self.apply_transforms = apply_transforms
         self.use_only_target_categories = use_only_target_categories
         self.generate_labels = generate_labels
         self.train_mode = train_mode.strip().lower()
@@ -88,13 +89,14 @@ class NYUYoloDataset(Dataset):
             targets: List of tensors for each scale.
         """
         # Load image, instance map, and label map
-        image = None
+        image, depth = None, None
         if self.train_mode == "rgb":
             image = self.images[index]
         elif self.train_mode == "hha":
             image = self.hha[index]
         elif self.train_mode == "fusion":
-            image = torch.stack([self.images[index], self.hha[index]])
+            image = self.images[index]
+            depth = self.hha[index]
         else:
             raise NotImplementedError
 
@@ -103,6 +105,8 @@ class NYUYoloDataset(Dataset):
 
         # Convert image to (H, W, C) and scale to [0, 255]
         image = np.transpose(image, (1, 2, 0)).astype(np.uint8)
+        if depth is not None:
+            depth = np.transpose(depth, (1, 2, 0)).astype(np.float32)
 
         # Extract bounding boxes
         bboxes = self._get_bounding_boxes(instance_map, label_map,
@@ -120,9 +124,15 @@ class NYUYoloDataset(Dataset):
                 np.savetxt(os.path.join("..", "NYUD", "labels", f"{index}.txt"), np_bboxes)
 
         # Apply transformations
-        if self.transform:
-            augmentations = self.transform(image=image, bboxes=bboxes)
+        if self.apply_transforms:
+            if self.train_mode == "fusion":
+                train_transforms, test_transforms = get_train_test_transforms_list({"depth": "image"})
+            else:
+                train_transforms, test_transforms = get_train_test_transforms_list()
+
+            augmentations = train_transforms(image=image, depth=depth, bboxes=bboxes)
             image = augmentations["image"]
+            depth = augmentations["depth"]
             bboxes = augmentations["bboxes"]
 
         # Prepare YOLO targets
@@ -150,7 +160,10 @@ class NYUYoloDataset(Dataset):
                 elif not has_anchor[scale_idx] and iou_anchors[anchor_index] > self.ignore_iou_thresh:
                     targets[scale_idx][anchor_on_scale, i, j, 0] = -1
 
-        return image, tuple(targets)
+        if self.train_mode == "fusion":
+            return torch.cat([image, depth], dim=0), tuple(targets)
+        else:
+            return image, tuple(targets)
 
     @staticmethod
     def _get_hha_encoded_images(hha_images_path: str):
@@ -240,16 +253,19 @@ class NYUYoloDataset(Dataset):
 
 def test():
     # anchors = config.ANCHORS
+    train_mode = str(input("Enter train mode (rgb or hha or fusion): "))
     anchors = config.ANCHORS
     dataset = NYUYoloDataset(
         mat_file=config.NYU_PATH,
+        hha_dir=config.HHA_IMAGE_DIR,
         image_size=416,
         anchors=anchors,
         S=[13, 26, 52],
         C=config.NYU_LABELS.__len__(),
-        transform=config.train_transforms,
+        apply_transforms=True,
         use_only_target_categories=True,
-        generate_labels=True
+        generate_labels=True,
+        train_mode=train_mode
     )
 
     S = [13, 26, 52]
@@ -266,6 +282,7 @@ def test():
         drop_last=False,
     )
     for x, y in tqdm(loader):
+        image, depth = x[:, 0:3, :, :], x[:, 3:, :, :]
         boxes = []
         for i in range(y[0].shape[1]):
             anchor = scaled_anchors[i]
@@ -274,7 +291,7 @@ def test():
             )[0]
         boxes = non_max_suppression(boxes, iou_threshold=1,
                                     threshold=0.7, box_format="midpoint")
-        plot_image(x[0].permute(1, 2, 0).to("cpu"), boxes)
+        plot_image(image[0].permute(1, 2, 0).to("cpu"), boxes)
         break
 
 

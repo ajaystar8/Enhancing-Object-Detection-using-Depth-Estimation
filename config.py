@@ -1,9 +1,5 @@
 import os
-
-import albumentations as A
-import cv2
 import torch
-from albumentations.pytorch import ToTensorV2
 
 DATASET = 'NYUD'
 DEVICE = "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu"
@@ -15,7 +11,7 @@ IMAGE_SIZE = 416
 LEARNING_RATE = 1e-5
 WEIGHT_DECAY = 1e-4
 NUM_EPOCHS = 50
-CONF_THRESHOLD = 0.5
+CONF_THRESHOLD = 0.3
 MAP_IOU_THRESH = 0.5
 NMS_IOU_THRESH = 0.45
 S = [IMAGE_SIZE // 32, IMAGE_SIZE // 16, IMAGE_SIZE // 8]
@@ -60,43 +56,6 @@ ANCHORS = [
 # ]
 
 scale = 1.1
-train_transforms = A.Compose(
-    [
-        A.LongestMaxSize(max_size=int(IMAGE_SIZE * scale)),
-        A.PadIfNeeded(
-            min_height=int(IMAGE_SIZE * scale),
-            min_width=int(IMAGE_SIZE * scale),
-            border_mode=cv2.BORDER_CONSTANT,
-            value=0
-        ),
-        A.RandomCrop(width=IMAGE_SIZE, height=IMAGE_SIZE),
-        A.ColorJitter(brightness=0.6, contrast=0.6,
-                      saturation=0.6, hue=0.6, p=0.4),
-        A.HorizontalFlip(p=0.5),
-        A.Blur(p=0.1),
-        A.CLAHE(p=0.1),
-        A.Posterize(p=0.1),
-        A.ToGray(p=0.1),
-        A.ChannelShuffle(p=0.05),
-        A.Normalize(mean=[0, 0, 0], std=[1, 1, 1], max_pixel_value=255, ),
-        ToTensorV2(),
-    ],
-    bbox_params=A.BboxParams(
-        format="yolo", min_visibility=0.4, label_fields=[], ),
-)
-
-test_transforms = A.Compose(
-    [
-        A.LongestMaxSize(max_size=IMAGE_SIZE),
-        A.PadIfNeeded(
-            min_height=IMAGE_SIZE, min_width=IMAGE_SIZE, border_mode=cv2.BORDER_CONSTANT, value=0
-        ),
-        A.Normalize(mean=[0, 0, 0], std=[1, 1, 1], max_pixel_value=255, ),
-        ToTensorV2(),
-    ],
-    bbox_params=A.BboxParams(
-        format="yolo", min_visibility=0.4, label_fields=[]),
-)
 
 NYU_LABELS = ['book', 'bottle', 'cabinet', 'ceiling', 'chair', 'cone', 'counter', 'dishwasher', 'faucet',
               'fire extinguisher', 'floor', 'garbage bin', 'microwave', 'paper towel dispenser', 'paper', 'pot',

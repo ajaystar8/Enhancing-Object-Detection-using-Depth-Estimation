@@ -608,6 +608,7 @@ def get_loaders_nyu(mat_file_path, train_mode, train_ratio=0.8):
         train_eval_loader (DataLoader): DataLoader for evaluating training data.
     """
     from NYUdataset import NYUYoloDataset
+    from transforms import get_train_test_transforms_list
 
     # Load the number of samples in the dataset
     import h5py
@@ -618,6 +619,7 @@ def get_loaders_nyu(mat_file_path, train_mode, train_ratio=0.8):
     train_indices, test_indices = generate_train_test_indices(num_samples, train_ratio)
 
     # Create training and testing datasets
+    train_transforms, test_transforms = get_train_test_transforms_list()
     train_dataset = NYUYoloDataset(
         mat_file=mat_file_path,
         hha_dir=config.HHA_IMAGE_DIR,
@@ -625,7 +627,7 @@ def get_loaders_nyu(mat_file_path, train_mode, train_ratio=0.8):
         image_size=config.IMAGE_SIZE,
         S=[config.IMAGE_SIZE // 32, config.IMAGE_SIZE // 16, config.IMAGE_SIZE // 8],
         C=40,
-        transform=config.train_transforms,
+        apply_transforms=True,
         indices=train_indices,
         use_only_target_categories=True,
         train_mode=train_mode
@@ -637,7 +639,7 @@ def get_loaders_nyu(mat_file_path, train_mode, train_ratio=0.8):
         image_size=config.IMAGE_SIZE,
         S=[config.IMAGE_SIZE // 32, config.IMAGE_SIZE // 16, config.IMAGE_SIZE // 8],
         C=40,
-        transform=config.test_transforms,
+        apply_transforms=True,
         indices=test_indices,
         use_only_target_categories=True,
         train_mode=train_mode
@@ -649,7 +651,7 @@ def get_loaders_nyu(mat_file_path, train_mode, train_ratio=0.8):
         image_size=config.IMAGE_SIZE,
         S=[config.IMAGE_SIZE // 32, config.IMAGE_SIZE // 16, config.IMAGE_SIZE // 8],
         C=40,
-        transform=config.test_transforms,
+        apply_transforms=True,
         indices=train_indices,
         use_only_target_categories=True,
         train_mode=train_mode

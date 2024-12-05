@@ -25,13 +25,17 @@ def train_fn(train_loader, model, optimizer, loss_fn, scaled_anchors):
     losses = []
 
     for batch_idx, (x, y) in enumerate(loop):
-        x = x.to(config.DEVICE)
+        image, depth = x[:, 0:3, :, :], x[:, 3:, :, :]
+        image = image.to(config.DEVICE)
+        if depth is not None:
+            depth = depth.to(config.DEVICE)
+            
         y0, y1, y2 = (
             y[0].to(config.DEVICE),
             y[1].to(config.DEVICE),
             y[2].to(config.DEVICE)
         )
-        out = model(x)
+        out = model(image)
 
         loss = (
                 loss_fn(out[0], y0, scaled_anchors[0]) +
@@ -72,7 +76,7 @@ def main():
 
     if config.LOAD_MODEL:
         load_checkpoint(
-            os.path.join(config.CHECKPOINT_DIR, "rgb_1_resume_ckpt.pth.tar"), model, optimizer
+            os.path.join(config.CHECKPOINT_DIR, "hha_1_ckpt.pth.tar"), model, optimizer
         )
 
     # Scale anchors to each prediction scale
