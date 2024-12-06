@@ -108,13 +108,13 @@ def main():
     os.makedirs(subfolder, exist_ok=True)
 
     for epoch in range(config.NUM_EPOCHS):
-        # print(f"--------[EPOCH-{epoch + 1}]-------------")
-        # epoch_loss = train_fn(train_loader, model, optimizer, loss_fn, scaled_anchors)
-        # training_history["loss"].append({f"Epoch-{epoch + 1}": epoch_loss})
-        # scheduler.step()
-        #
-        # if best_map_till_now < 0:
-        #     save_checkpoint(model, optimizer, filename=f"initial_ckpt.pth.tar")
+        print(f"--------[EPOCH-{epoch + 1}]-------------")
+        epoch_loss = train_fn(train_loader, model, optimizer, loss_fn, scaled_anchors)
+        training_history["loss"].append({f"Epoch-{epoch + 1}": epoch_loss})
+        scheduler.step()
+
+        if best_map_till_now < 0:
+            save_checkpoint(model, optimizer, filename=f"initial_ckpt.pth.tar")
 
         print("On Test loader:")
         class_acc, obj_acc, noobj_acc = check_class_accuracy(model, test_loader, threshold=config.CONF_THRESHOLD)
