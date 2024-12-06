@@ -3,7 +3,6 @@ import torch.nn as nn
 from torchsummary import summary
 from torchvision.models import ResNet18_Weights, resnet18
 
-from utils.utils import extract_layers
 
 """
 Tuple: (filters, kernel_size, stride) 
@@ -125,6 +124,8 @@ class ResYOLOv3(nn.Module):
     """
 
     def freeze_backbone_weights(self):
+        from utils.utils import extract_layers
+
         module_list = extract_layers(self)
         for idx, module_item in enumerate(module_list):
             if idx == 62:

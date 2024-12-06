@@ -13,6 +13,7 @@ from torchmetrics.detection.mean_ap import MeanAveragePrecision
 from tqdm import tqdm
 
 import config
+from models.resyolov3 import ResYOLOv3
 
 
 def iou_width_height(boxes1, boxes2):
@@ -136,60 +137,60 @@ def mean_average_precision_optimized(pred_boxes, true_boxes):
     return metric.compute()
 
 
-def get_evaluation_bboxes_optimized(loader, model, iou_threshold, anchors, threshold, device="cuda"):
-    """
-    Optimized function to get evaluation bounding boxes for object detection.
-    """
-    model.eval()
-    train_idx = 0
-    all_pred_boxes = []
-    all_true_boxes = []
-
-    scaled_anchors = [
-        torch.tensor(anchors[2 - i]).to(device) * config.IMAGE_SIZE // (2 ** (i + 3)) for i in range(3)
-    ]
-
-    for batch_idx, (x, labels) in enumerate(tqdm(loader)):
-        x = x.to(device)
-
-        with torch.no_grad():
-            predictions = model(x)
-
-        batch_size = x.shape[0]
-        all_bboxes = []
-
-        # Combine bounding box generation for all scales
-        for i, pred in enumerate(predictions):
-            S = pred.shape[2]
-            boxes_scale_i = cells_to_bboxes(pred, scaled_anchors[i], S=S, is_preds=True)
-            all_bboxes.append(boxes_scale_i)
-
-        # Merge scales and process each image in batch
-        bboxes = [sum(bbox_list, []) for bbox_list in zip(*all_bboxes)]
-        true_bboxes = cells_to_bboxes(labels[2], scaled_anchors[-1], S=S, is_preds=False)
-
-        for idx in tqdm(range(batch_size)):
-            boxes, scores, labels = zip(
-                *[(torch.tensor(bbox[1:-1]), bbox[0], train_idx) for bbox in bboxes[idx] if bbox[1] > threshold])
-            if boxes:
-                boxes = torch.stack(boxes).to(device)
-                scores = torch.tensor(scores).to(device)
-                labels = torch.tensor(labels).to(device)
-
-                # Use batched NMS for the current batch
-                keep_indices = torchvision.ops.nms(boxes, scores, iou_threshold)
-                nms_boxes = [bboxes[idx][i] for i in keep_indices]
-
-                all_pred_boxes.extend([[train_idx] + nms_box for nms_box in nms_boxes])
-
-            for box in true_bboxes[idx]:
-                if box[1] > threshold:
-                    all_true_boxes.append([train_idx] + box)
-
-            train_idx += 1
-
-    model.train()
-    return all_pred_boxes, all_true_boxes
+# def get_evaluation_bboxes_optimized(loader, model, iou_threshold, anchors, threshold, device="cuda"):
+#     """
+#     Optimized function to get evaluation bounding boxes for object detection.
+#     """
+#     model.eval()
+#     train_idx = 0
+#     all_pred_boxes = []
+#     all_true_boxes = []
+#
+#     scaled_anchors = [
+#         torch.tensor(anchors[2 - i]).to(device) * config.IMAGE_SIZE // (2 ** (i + 3)) for i in range(3)
+#     ]
+#
+#     for batch_idx, (x, labels) in enumerate(tqdm(loader)):
+#         x = x.to(device)
+#
+#         with torch.no_grad():
+#             predictions = model(x)
+#
+#         batch_size = x.shape[0]
+#         all_bboxes = []
+#
+#         # Combine bounding box generation for all scales
+#         for i, pred in enumerate(predictions):
+#             S = pred.shape[2]
+#             boxes_scale_i = cells_to_bboxes(pred, scaled_anchors[i], S=S, is_preds=True)
+#             all_bboxes.append(boxes_scale_i)
+#
+#         # Merge scales and process each image in batch
+#         bboxes = [sum(bbox_list, []) for bbox_list in zip(*all_bboxes)]
+#         true_bboxes = cells_to_bboxes(labels[2], scaled_anchors[-1], S=S, is_preds=False)
+#
+#         for idx in tqdm(range(batch_size)):
+#             boxes, scores, labels = zip(
+#                 *[(torch.tensor(bbox[1:-1]), bbox[0], train_idx) for bbox in bboxes[idx] if bbox[1] > threshold])
+#             if boxes:
+#                 boxes = torch.stack(boxes).to(device)
+#                 scores = torch.tensor(scores).to(device)
+#                 labels = torch.tensor(labels).to(device)
+#
+#                 # Use batched NMS for the current batch
+#                 keep_indices = torchvision.ops.nms(boxes, scores, iou_threshold)
+#                 nms_boxes = [bboxes[idx][i] for i in keep_indices]
+#
+#                 all_pred_boxes.extend([[train_idx] + nms_box for nms_box in nms_boxes])
+#
+#             for box in true_bboxes[idx]:
+#                 if box[1] > threshold:
+#                     all_true_boxes.append([train_idx] + box)
+#
+#             train_idx += 1
+#
+#     model.train()
+#     return all_pred_boxes, all_true_boxes
 
 
 def mean_average_precision(
@@ -369,12 +370,18 @@ def get_evaluation_bboxes(
     all_pred_boxes = []
     all_true_boxes = []
     for batch_idx, (x, labels) in enumerate(tqdm(loader)):
-        x = x.to(device)
+        image, depth = x[:, 0:3, :, :], x[:, 3:, :, :]
+        image = image.to(config.DEVICE)
+        if depth is not None:
+            depth = depth.to(config.DEVICE)
 
         with torch.no_grad():
-            predictions = model(x)
+            if isinstance(model, ResYOLOv3):
+                predictions = model(image, depth)
+            else:
+                predictions = model(image)
 
-        batch_size = x.shape[0]
+        batch_size = image.shape[0]
         bboxes = [[] for _ in range(batch_size)]
         for i in range(3):
             S = predictions[i].shape[2]
@@ -458,9 +465,16 @@ def check_class_accuracy(model, loader, threshold):
     tot_obj, correct_obj = 0, 0
 
     for idx, (x, y) in enumerate(tqdm(loader)):
-        x = x.to(config.DEVICE)
+        image, depth = x[:, 0:3, :, :], x[:, 3:, :, :]
+        image = image.to(config.DEVICE)
+        if depth is not None:
+            depth = depth.to(config.DEVICE)
+
         with torch.no_grad():
-            out = model(x)
+            if isinstance(model, ResYOLOv3):
+                out = model(image, depth)
+            else:
+                out = model(image)
 
         for i in range(3):
             y[i] = y[i].to(config.DEVICE)
@@ -547,10 +561,18 @@ def load_checkpoint(checkpoint_file, model, optimizer=None, device='cpu'):
 def plot_couple_examples(model, loader, thresh, iou_thresh, anchors):
     model.eval()
     x, y = next(iter(loader))
-    x = x.to("cuda")
+
+    image, depth = x[:, 0:3, :, :], x[:, 3:, :, :]
+    image = image.to(config.DEVICE)
+    if depth is not None:
+        depth = depth.to(config.DEVICE)
+
     with torch.no_grad():
-        out = model(x)
-        bboxes = [[] for _ in range(x.shape[0])]
+        if isinstance(model, ResYOLOv3):
+            out = model(image, depth)
+        else:
+            out = model(image)
+        bboxes = [[] for _ in range(image.shape[0])]
         for i in range(3):
             batch_size, A, S, _, _ = out[i].shape
             anchor = anchors[i]
@@ -566,7 +588,7 @@ def plot_couple_examples(model, loader, thresh, iou_thresh, anchors):
         nms_boxes = non_max_suppression(
             bboxes[i], iou_threshold=iou_thresh, threshold=thresh, box_format="midpoint",
         )
-        plot_image(x[i].permute(1, 2, 0).detach().cpu(), nms_boxes)
+        plot_image(image[i].permute(1, 2, 0).detach().cpu(), nms_boxes)
 
 
 def generate_train_test_indices(num_samples, train_ratio=0.8):

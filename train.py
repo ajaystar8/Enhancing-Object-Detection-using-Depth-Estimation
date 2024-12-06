@@ -108,13 +108,13 @@ def main():
     os.makedirs(subfolder, exist_ok=True)
 
     for epoch in range(config.NUM_EPOCHS):
-        print(f"--------[EPOCH-{epoch + 1}]-------------")
-        epoch_loss = train_fn(train_loader, model, optimizer, loss_fn, scaled_anchors)
-        training_history["loss"].append({f"Epoch-{epoch + 1}": epoch_loss})
-        scheduler.step()
-
-        if best_map_till_now < 0:
-            save_checkpoint(model, optimizer, filename=f"initial_ckpt.pth.tar")
+        # print(f"--------[EPOCH-{epoch + 1}]-------------")
+        # epoch_loss = train_fn(train_loader, model, optimizer, loss_fn, scaled_anchors)
+        # training_history["loss"].append({f"Epoch-{epoch + 1}": epoch_loss})
+        # scheduler.step()
+        #
+        # if best_map_till_now < 0:
+        #     save_checkpoint(model, optimizer, filename=f"initial_ckpt.pth.tar")
 
         print("On Test loader:")
         class_acc, obj_acc, noobj_acc = check_class_accuracy(model, test_loader, threshold=config.CONF_THRESHOLD)
@@ -122,7 +122,7 @@ def main():
         training_history["obj_acc"].append({f"Epoch-{epoch + 1}": obj_acc.item()})
         training_history["noobj_acc"].append({f"Epoch-{epoch + 1}": noobj_acc.item()})
 
-        if epoch >= 10 or config.LOAD_MODEL:
+        if epoch >= 0 or config.LOAD_MODEL:
             # Run model on test set and convert outputs to bounding boxes relative to image
             pred_boxes, true_boxes = get_evaluation_bboxes(
                 test_loader,
@@ -132,6 +132,7 @@ def main():
                 threshold=config.CONF_THRESHOLD,
                 device=config.DEVICE
             )
+            print(len(pred_boxes))
             training_history["predicted_boxes"].append({f"Epoch-{epoch + 1}": len(pred_boxes)})
             # Compute mean average precision
             mapval, ap_per_class = mean_average_precision(
