@@ -713,10 +713,12 @@ def extract_layers(module: nn.Module):
     layers = []
     for name, submodule in module.named_children():
         # If the submodule has children, recursively process them
+        if isinstance(submodule, resyolov3.ResnetBlock):
+            continue
         if list(submodule.children()):
             layers.extend(extract_layers(submodule))
         else:
             # Append as [name, submodule] for leaf modules
-            if name != "leaky" and not isinstance(submodule, resyolov3.ResnetBlock):
+            if name != "leaky":
                 layers.append([name, submodule])
     return layers

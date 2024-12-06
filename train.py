@@ -68,11 +68,11 @@ def main():
         model = YOLOv3(num_classes=config.NUM_CLASSES).to(config.DEVICE)
 
         # Load pretrained weights
-        weight_loader = LoadYOLOWeights(config.CONFIG_FILE_PATH, config.WEIGHTS_FILE_PATH)
-        weight_loader.load(model)
+    weight_loader = LoadYOLOWeights(config.CONFIG_FILE_PATH, config.WEIGHTS_FILE_PATH)
+    weight_loader.load(model)
 
-        # Freeze weights
-        # model.freeze_backbone_weights()
+    # Freeze weights
+    # model.freeze_backbone_weights()
 
     optimizer = optim.Adam(
         model.parameters(), lr=config.LEARNING_RATE, weight_decay=config.WEIGHT_DECAY
