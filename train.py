@@ -8,7 +8,8 @@ from tqdm import tqdm
 import config
 from loss import YoloLoss
 from models.resyolov3 import ResYOLOv3
-from models.yolov3 import YOLOv3
+# from models.yolov3 import YOLOv3
+from models.model_depth import YOLOv3 as YOLOv3Depth
 from utils.load_weights import LoadYOLOWeights
 from utils.utils import (
     mean_average_precision,
@@ -36,7 +37,7 @@ def train_fn(train_loader, model, optimizer, loss_fn, scaled_anchors):
             y[1].to(config.DEVICE),
             y[2].to(config.DEVICE)
         )
-        if isinstance(model, ResYOLOv3):
+        if isinstance(model, ResYOLOv3) or isinstance(model, YOLOv3Depth):
             out = model(image, depth)
         else:
             out = model(image)
@@ -65,11 +66,11 @@ def main():
         model = ResYOLOv3(num_classes=config.NUM_CLASSES).to(config.DEVICE)
 
     else:
-        model = YOLOv3(num_classes=config.NUM_CLASSES).to(config.DEVICE)
+        model = YOLOv3Depth(num_classes=config.NUM_CLASSES).to(config.DEVICE)
 
-        # Load pretrained weights
-    weight_loader = LoadYOLOWeights(config.CONFIG_FILE_PATH, config.WEIGHTS_FILE_PATH)
-    weight_loader.load(model)
+    # Load pretrained weights
+    # weight_loader = LoadYOLOWeights(config.CONFIG_FILE_PATH, config.WEIGHTS_FILE_PATH)
+    # weight_loader.load(model)
 
     # Freeze weights
     # model.freeze_backbone_weights()
@@ -122,7 +123,7 @@ def main():
         training_history["obj_acc"].append({f"Epoch-{epoch + 1}": obj_acc.item()})
         training_history["noobj_acc"].append({f"Epoch-{epoch + 1}": noobj_acc.item()})
 
-        if epoch >= 0 or config.LOAD_MODEL:
+        if epoch >= 10 or config.LOAD_MODEL:
             # Run model on test set and convert outputs to bounding boxes relative to image
             pred_boxes, true_boxes = get_evaluation_bboxes(
                 test_loader,

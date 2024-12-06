@@ -14,6 +14,7 @@ from tqdm import tqdm
 
 import config
 from models.resyolov3 import ResYOLOv3
+from models.model_depth import YOLOv3 as YOLOv3Depth
 
 
 def iou_width_height(boxes1, boxes2):
@@ -376,7 +377,7 @@ def get_evaluation_bboxes(
             depth = depth.to(config.DEVICE)
 
         with torch.no_grad():
-            if isinstance(model, ResYOLOv3):
+            if isinstance(model, ResYOLOv3) or isinstance(model, YOLOv3Depth):
                 predictions = model(image, depth)
             else:
                 predictions = model(image)
@@ -471,7 +472,7 @@ def check_class_accuracy(model, loader, threshold):
             depth = depth.to(config.DEVICE)
 
         with torch.no_grad():
-            if isinstance(model, ResYOLOv3):
+            if isinstance(model, ResYOLOv3) or isinstance(model, YOLOv3Depth):
                 out = model(image, depth)
             else:
                 out = model(image)
