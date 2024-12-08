@@ -63,9 +63,10 @@ def main():
 
     if model_type == "resyolov3":
         model = ResYOLOv3(num_classes=config.NUM_CLASSES).to(config.DEVICE)
-
-    else:
+    elif model_type == "yolov3":
         model = YOLOv3(num_classes=config.NUM_CLASSES).to(config.DEVICE)
+    else:
+        raise NotImplementedError
 
         # Load pretrained weights
     weight_loader = LoadYOLOWeights(config.CONFIG_FILE_PATH, config.WEIGHTS_FILE_PATH)
@@ -86,7 +87,7 @@ def main():
 
     if config.LOAD_MODEL:
         load_checkpoint(
-            os.path.join(config.CHECKPOINT_DIR, "hha_1_ckpt.pth.tar"), model, optimizer
+            os.path.join(config.CHECKPOINT_DIR, "initial_ckpt.pth.tar"), model, optimizer
         )
 
     # Scale anchors to each prediction scale
@@ -122,7 +123,7 @@ def main():
         training_history["obj_acc"].append({f"Epoch-{epoch + 1}": obj_acc.item()})
         training_history["noobj_acc"].append({f"Epoch-{epoch + 1}": noobj_acc.item()})
 
-        if epoch >= 0 or config.LOAD_MODEL:
+        if epoch >= 10 or config.LOAD_MODEL:
             # Run model on test set and convert outputs to bounding boxes relative to image
             pred_boxes, true_boxes = get_evaluation_bboxes(
                 test_loader,
@@ -162,6 +163,6 @@ def main():
 
 
 if __name__ == "__main__":
-    config.LOAD_MODEL = False
+    config.LOAD_MODEL = True
     seed_everything()
     main()
