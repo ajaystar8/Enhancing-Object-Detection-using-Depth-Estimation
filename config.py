@@ -26,6 +26,8 @@ RGB_LABEL_DIR = os.path.join(DATASET, "labels")
 
 HHA_IMAGE_DIR = os.path.join(DATASET, "hha")
 NYU_PATH = "./resources/nyu_depth_v2_labeled.mat"
+PLOTS_DIR = os.path.join("plots")
+TRAIN_LOGS = os.path.join("training_logs")
 
 # YOLOv3 specific
 CONFIG_FILE_PATH = "./weights/yolov3.cfg"
