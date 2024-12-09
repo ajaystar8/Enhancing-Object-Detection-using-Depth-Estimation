@@ -122,7 +122,7 @@ def main():
         training_history["obj_acc"].append({f"Epoch-{epoch + 1}": obj_acc.item()})
         training_history["noobj_acc"].append({f"Epoch-{epoch + 1}": noobj_acc.item()})
 
-        if epoch >= 0 or config.LOAD_MODEL:
+        if epoch >= 10 or config.LOAD_MODEL:
             # Run model on test set and convert outputs to bounding boxes relative to image
             pred_boxes, true_boxes = get_evaluation_bboxes(
                 test_loader,

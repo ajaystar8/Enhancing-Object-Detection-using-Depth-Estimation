@@ -184,7 +184,7 @@ NYU_LABELS = ['book', 'bottle', 'cabinet', 'ceiling', 'chair', 'cone', 'counter'
               'hammer', 'matchbox', 'pepper', 'yellow pepper', 'duck', 'eggplant', 'glass ware', 'sewing machine',
               'rolled up rug', 'doily', 'coffee pot', 'torah']
 
-NYU_TARGET_CATEGORIES = ['bathtub', 'bed', 'bookshelf', 'box', 'chair', 'counter', 'desk', 'door', 'dresser',
+NYU_TARGET_CATEGORIES = ['bed', 'bookshelf', 'chair', 'counter', 'desk', 'door', 'dresser',
                          'garbage bin', 'lamp', 'monitor', 'night stand', 'pillow', 'sink', 'sofa', 'table',
                          'television', 'toilet']
 
