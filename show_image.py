@@ -27,7 +27,8 @@ def main():
     optimizer = optim.Adam(
         filter(lambda p: p.requires_grad, model.parameters()), lr=config.LEARNING_RATE, weight_decay=config.WEIGHT_DECAY
     )
-    train_loader, test_loader, train_eval_loader = get_loaders_nyu(mat_file_path=config.NYU_PATH, train_mode="rgb")
+    train_mode = str(input("Enter train mode (rgb or hha or fusion): "))
+    train_loader, test_loader, train_eval_loader = get_loaders_nyu(mat_file_path=config.NYU_PATH, train_mode=train_mode)
 
     ckpt_name = str(input("Enter the checkpoint file name (include .pth.tar): "))
     try:

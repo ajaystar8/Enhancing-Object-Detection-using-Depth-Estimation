@@ -67,7 +67,7 @@ def getHHA(C, D, RD):
 
 def generate_hha(idx):
     # generate hha for the i-th image
-    root = '../../NYUD/'
+    root = './NYUD/'
 
     D, RD = getImage(idx, root)
     camera_matrix = getCameraParam('color')

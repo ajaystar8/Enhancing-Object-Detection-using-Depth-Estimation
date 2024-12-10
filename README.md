@@ -1,5 +1,11 @@
 # Exploring YOLOv3’s Potential: Object Detection with Depth Data
 
+## Downloading the dataset
+
+1. Download the `Labelled Dataset (~2.8GB)` from [NYU Depth Dataset V2](https://cs.nyu.edu/~fergus/datasets/nyu_depth_v2.html). After the download is complete, you would have a `.mat` file. 
+2. Place this file inside the `resources` folder. 
+3. To generate the HHA image dataset, run the `Depth2HHA/getHHA.py`. This will place the HHA images inside the `NYUD` directory. 
+
 ## Training the Model
 
 1. Execute the `train.py` script by running the main method.
