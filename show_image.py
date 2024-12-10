@@ -10,7 +10,7 @@ from utils.utils import get_evaluation_bboxes, get_loaders_nyu, load_checkpoint,
 
 
 def main():
-    config.CONF_THRESHOLD = 0.7
+    config.CONF_THRESHOLD = 0.6
     config.NMS_IOU_THRESH = 0.5
 
     model_type = str(input("Enter model type to train (yolov3 or resyolov3_add or resyolov3_depth): "))
@@ -64,10 +64,13 @@ def main():
 
     # plot 5 images
     for i in range(5):
-        image = test_loader.dataset[i][0].permute(1, 2, 0).to("cpu").numpy()
+        if model_type == "yolov3":
+            image = test_loader.dataset[i][0].permute(1, 2, 0).to("cpu").numpy()
+        else:
+            # Get the first three channels of the image
+            image = test_loader.dataset[i][0][:3].permute(1, 2, 0).to("cpu").numpy()
         bboxes = converted_boxes[i]
         plot_image(image, bboxes)
-
 
 if __name__ == "__main__":
     main()
