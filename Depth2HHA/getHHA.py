@@ -77,7 +77,7 @@ def generate_hha(idx):
 
 
 if __name__ == "__main__":
-    root = '../../NYUD/'
+    root = './NYUD/'
 
     processNum = 16
     pool = Pool(processNum)
