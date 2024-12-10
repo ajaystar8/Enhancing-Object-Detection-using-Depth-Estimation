@@ -8,6 +8,7 @@ from tqdm import tqdm
 import config
 from loss import YoloLoss
 from models.resyolov3 import ResYOLOv3
+from models.resyolov3depth import ResYOLOv3Depth
 from models.yolov3 import YOLOv3
 from utils.load_weights import LoadYOLOWeights
 from utils.utils import (
@@ -59,10 +60,12 @@ def train_fn(train_loader, model, optimizer, loss_fn, scaled_anchors):
 
 
 def main():
-    model_type = str(input("Enter model type to train (yolov3 or resyolov3): "))
+    model_type = str(input("Enter model type to train (yolov3 or resyolov3_add or resyolov3_depth): "))
 
-    if model_type == "resyolov3":
+    if model_type == "resyolov3_add":
         model = ResYOLOv3(num_classes=config.NUM_CLASSES).to(config.DEVICE)
+    elif model_type == "resyolov3_depth":
+        model = ResYOLOv3Depth(num_classes=config.NUM_CLASSES).to(config.DEVICE)
     elif model_type == "yolov3":
         model = YOLOv3(num_classes=config.NUM_CLASSES).to(config.DEVICE)
     else:

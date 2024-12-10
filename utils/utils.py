@@ -137,62 +137,6 @@ def mean_average_precision_optimized(pred_boxes, true_boxes):
     return metric.compute()
 
 
-# def get_evaluation_bboxes_optimized(loader, model, iou_threshold, anchors, threshold, device="cuda"):
-#     """
-#     Optimized function to get evaluation bounding boxes for object detection.
-#     """
-#     model.eval()
-#     train_idx = 0
-#     all_pred_boxes = []
-#     all_true_boxes = []
-#
-#     scaled_anchors = [
-#         torch.tensor(anchors[2 - i]).to(device) * config.IMAGE_SIZE // (2 ** (i + 3)) for i in range(3)
-#     ]
-#
-#     for batch_idx, (x, labels) in enumerate(tqdm(loader)):
-#         x = x.to(device)
-#
-#         with torch.no_grad():
-#             predictions = model(x)
-#
-#         batch_size = x.shape[0]
-#         all_bboxes = []
-#
-#         # Combine bounding box generation for all scales
-#         for i, pred in enumerate(predictions):
-#             S = pred.shape[2]
-#             boxes_scale_i = cells_to_bboxes(pred, scaled_anchors[i], S=S, is_preds=True)
-#             all_bboxes.append(boxes_scale_i)
-#
-#         # Merge scales and process each image in batch
-#         bboxes = [sum(bbox_list, []) for bbox_list in zip(*all_bboxes)]
-#         true_bboxes = cells_to_bboxes(labels[2], scaled_anchors[-1], S=S, is_preds=False)
-#
-#         for idx in tqdm(range(batch_size)):
-#             boxes, scores, labels = zip(
-#                 *[(torch.tensor(bbox[1:-1]), bbox[0], train_idx) for bbox in bboxes[idx] if bbox[1] > threshold])
-#             if boxes:
-#                 boxes = torch.stack(boxes).to(device)
-#                 scores = torch.tensor(scores).to(device)
-#                 labels = torch.tensor(labels).to(device)
-#
-#                 # Use batched NMS for the current batch
-#                 keep_indices = torchvision.ops.nms(boxes, scores, iou_threshold)
-#                 nms_boxes = [bboxes[idx][i] for i in keep_indices]
-#
-#                 all_pred_boxes.extend([[train_idx] + nms_box for nms_box in nms_boxes])
-#
-#             for box in true_bboxes[idx]:
-#                 if box[1] > threshold:
-#                     all_true_boxes.append([train_idx] + box)
-#
-#             train_idx += 1
-#
-#     model.train()
-#     return all_pred_boxes, all_true_boxes
-
-
 def mean_average_precision(
         pred_boxes, true_boxes, iou_threshold=0.5, box_format="midpoint", num_classes=20
 ):
@@ -362,7 +306,7 @@ def get_evaluation_bboxes(
         anchors,
         threshold,
         box_format="midpoint",
-        device="cuda",
+        device=config.DEVICE,
 ):
     # make sure model is in eval before get bboxes
     model.eval()

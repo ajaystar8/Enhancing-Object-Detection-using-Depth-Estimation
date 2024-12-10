@@ -48,5 +48,5 @@ with torch.no_grad():
         bboxes = cells_to_bboxes(outputs[i], np.array(config.ANCHORS[i]), S, True)[0]
         bboxes_all_scales.extend(bboxes)
 
-    nms_bboxes_all_scales = non_max_suppression(bboxes_all_scales, iou_threshold=1, threshold=0.7, box_format="corners")
+    nms_bboxes_all_scales = non_max_suppression(bboxes_all_scales, iou_threshold=1, threshold=0.3, box_format="corners")
     plot_image(image, nms_bboxes_all_scales)
