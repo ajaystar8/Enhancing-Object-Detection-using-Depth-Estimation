@@ -1,6 +1,8 @@
 # --*-- coding:utf-8 --*--
 import numpy as np
-from util import *
+
+from Depth2HHA.hha_utils.util import filterItChopOff, invertIt, mutiplyIt, getRMatrix, getYDir, rotatePC
+from utils import *
 
 np.seterr(divide='ignore', invalid='ignore')
 
