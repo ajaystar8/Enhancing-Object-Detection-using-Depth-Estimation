@@ -115,9 +115,9 @@ class ScalePrediction(nn.Module):
         )
 
 
-class ResYOLOv3(nn.Module):
+class ResYOLOv3Depth(nn.Module):
     def __init__(self, in_channels=3, num_classes=20):
-        super(ResYOLOv3, self).__init__()
+        super(ResYOLOv3Depth, self).__init__()
         self.num_classes = num_classes
         self.in_channels = in_channels
         self.layers = self._create_conv_layers()
@@ -201,7 +201,7 @@ class ResYOLOv3(nn.Module):
 def test():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     num_classes = 19
-    model = ResYOLOv3(num_classes=19).to(device)
+    model = ResYOLOv3Depth(num_classes=19).to(device)
     img_size = 416
     x = torch.randn((2, 3, img_size, img_size)).to(device)
     hha = torch.randn((2, 3, img_size, img_size)).to(device)
