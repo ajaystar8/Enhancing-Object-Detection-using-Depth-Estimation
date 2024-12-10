@@ -45,16 +45,13 @@ config = [
 
 
 class ResnetBlock(nn.Module):
-    def __init__(self, in_channels, out_channels, *args, **kwargs):
+    def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         resnet = resnet18(weights=ResNet18_Weights.DEFAULT)
         self.resnet_backbone = torch.nn.Sequential(*list(resnet.children())[:-2])
-        self.conv = CNNBlock(in_channels, out_channels, kernel_size=1)
 
-    def forward(self, x, hha):
-        x = torch.cat([x, self.resnet_backbone(hha)], dim=1)
-        x = self.conv(x)
-        return x
+    def forward(self, x):
+        return self.resnet_backbone(x)
 
 
 class CNNBlock(nn.Module):
@@ -147,7 +144,7 @@ class ResYOLOv3(nn.Module):
                 continue
 
             elif isinstance(layer, ResnetBlock):
-                x = layer(x, hha)
+                x = x + layer(hha)
                 continue
 
             x = layer(x)
@@ -193,18 +190,17 @@ class ResYOLOv3(nn.Module):
                     in_channels = in_channels * 3
 
                 elif module == "C":
-                    layers.append(ResnetBlock(in_channels * 2, in_channels))
+                    layers.append(ResnetBlock())
 
         return layers
 
 
 def test():
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     num_classes = 19
-    model = ResYOLOv3(num_classes=19).to(device)
+    model = ResYOLOv3(num_classes=19)
     img_size = 416
-    x = torch.randn((2, 3, img_size, img_size)).to(device)
-    hha = torch.randn((2, 3, img_size, img_size)).to(device)
+    x = torch.randn((2, 3, img_size, img_size))
+    hha = torch.randn((2, 3, img_size, img_size))
     out = model(x, hha)
     assert out[0].shape == (2, 3, img_size // 32, img_size // 32, 5 + num_classes)
     assert out[1].shape == (2, 3, img_size // 16, img_size // 16, 5 + num_classes)
