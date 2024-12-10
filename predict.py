@@ -8,24 +8,28 @@ from utils.utils import *
 config_file_path = "./weights/yolov3.cfg"
 weights_file_path = "./weights/yolov3.weights"
 
-model = YOLOv3(num_classes=config.NUM_CLASSES)
+model = ResYOLOv3(num_classes=config.NUM_CLASSES)
 
-load_checkpoint(os.path.join(config.CHECKPOINT_DIR, "initial_ckpt.pth.tar"), model)
+load_checkpoint(os.path.join(config.CHECKPOINT_DIR, "rgb_hha_resnet_concat_addn_50_0_5_ckpt.pth.tar"), model)
 
 # Switch to evaluation mode
 model.eval()
 
 # Preprocessing
-image = Image.open("../NYUD/images/0.png").convert("RGB")
+idx = np.random.randint(1449)
+print(idx)
+image = Image.open(f"./NYUD/images/{idx}.png").convert("RGB")
+hha = Image.open(f"./NYUD/hha/{idx}.png").convert("RGB")
 transform = transforms.Compose([
     transforms.Resize((416, 416)),
     transforms.ToTensor(),
 ])
 input_tensor = transform(image).unsqueeze(0)
+hha_tensor = transform(hha).unsqueeze(0)
 
 # Inference
 with torch.no_grad():
-    outputs = model(input_tensor)
+    outputs = model(input_tensor, hha_tensor)
     bboxes_all_scales = []
 
     for i in range(len(outputs)):
