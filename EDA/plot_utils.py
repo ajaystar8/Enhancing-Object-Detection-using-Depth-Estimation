@@ -34,26 +34,43 @@ def plot_loss_epoch_curve(loss_values, experiment_name):
                 bbox_inches='tight')
 
 
-def plot_accuracy_epoch_curve(scores, quantity_name, experiment_name):
+def plot_accuracy_epoch_curve(accuracy_scores, experiment_name):
     sns.set(style="darkgrid")
 
-    epochs = list(range(len(scores)))
+    class_accuracy = accuracy_scores['class_accuracy']
+    object_accuracy = accuracy_scores['obj_accuracy']
+    noobj_accuracy = accuracy_scores['noobj_accuracy']
+    epochs = list(range(len(class_accuracy)))
+
     class_accuracy_list = []
-    for item in scores:
+    for item in class_accuracy:
         for key, value in item.items():
-            class_accuracy_list.append(value)
+            class_accuracy_list.append(value * 100)
+
+    object_accuracy_list = []
+    for item in object_accuracy:
+        for key, value in item.items():
+            object_accuracy_list.append(value * 100)
+
+    noobj_accuracy_list = []
+    for item in noobj_accuracy:
+        for key, value in item.items():
+            noobj_accuracy_list.append(value * 100)
 
     plt.figure(figsize=(10, 6))
-    sns.lineplot(x=epochs, y=class_accuracy_list, color='b', label='Loss', linewidth=2)
+
+    sns.lineplot(x=epochs, y=class_accuracy_list, label="Class Accuracy", color="#1f77b4", linewidth=2)
+    sns.lineplot(x=epochs, y=object_accuracy_list, label="Object Accuracy", color="#2ca02c", linewidth=2)
+    sns.lineplot(x=epochs, y=noobj_accuracy_list, label="No Object Accuracy", color="#d62728", linewidth=2)
 
     plt.xlabel('Epochs', fontsize=12)
-    plt.ylabel(f'{quantity_name.title()}', fontsize=12)
-    plt.title(f'{quantity_name.title()} vs Epochs', fontsize=14)
+    plt.ylabel('Score (in %)', fontsize=12)
+    plt.title(f'Accuracy Scores vs Epochs', fontsize=14)
 
     plt.legend()
 
     os.makedirs(os.path.join(config.PLOTS_DIR, experiment_name), exist_ok=True)
-    plt.savefig(os.path.join(config.PLOTS_DIR, experiment_name, f'{quantity_name}_accuracy_curve.png'), format="png",
+    plt.savefig(os.path.join(config.PLOTS_DIR, experiment_name, f'accuracy_scores_curve.png'), format="png",
                 dpi=300,
                 bbox_inches='tight')
 
@@ -68,12 +85,14 @@ def plot_map_epoch_curve(map_scores, quantity_name, experiment_name):
             if value is not None:
                 map_list.append(value)
 
+    map_list = [value * 100 for value in map_list]
+
     plt.figure(figsize=(10, 6))
     sns.lineplot(x=epochs, y=map_list, color='b', label='Loss', linewidth=2)
 
     plt.xlabel('Epochs', fontsize=12)
-    plt.ylabel(f'{quantity_name.upper()}', fontsize=12)
-    plt.title(f'{quantity_name.upper()} vs Epochs', fontsize=14)
+    plt.ylabel(f'{quantity_name} (in %)', fontsize=12)
+    plt.title(f'{quantity_name} vs Epochs', fontsize=14)
 
     plt.legend()
 

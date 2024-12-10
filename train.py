@@ -68,7 +68,7 @@ def main():
     else:
         raise NotImplementedError
 
-        # Load pretrained weights
+    # Load pretrained weights
     weight_loader = LoadYOLOWeights(config.CONFIG_FILE_PATH, config.WEIGHTS_FILE_PATH)
     weight_loader.load(model)
 
@@ -163,6 +163,6 @@ def main():
 
 
 if __name__ == "__main__":
-    config.LOAD_MODEL = True
+    config.LOAD_MODEL = False
     seed_everything()
     main()
