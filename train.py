@@ -163,6 +163,5 @@ def main():
 
 
 if __name__ == "__main__":
-    config.LOAD_MODEL = True
     seed_everything()
     main()

@@ -11,7 +11,7 @@ IMAGE_SIZE = 416
 LEARNING_RATE = 1e-5
 WEIGHT_DECAY = 1e-4
 NUM_EPOCHS = 50
-CONF_THRESHOLD = 0.5
+CONF_THRESHOLD = 0.3
 MAP_IOU_THRESH = 0.5
 NMS_IOU_THRESH = 0.45
 S = [IMAGE_SIZE // 32, IMAGE_SIZE // 16, IMAGE_SIZE // 8]
@@ -184,7 +184,7 @@ NYU_LABELS = ['book', 'bottle', 'cabinet', 'ceiling', 'chair', 'cone', 'counter'
               'hammer', 'matchbox', 'pepper', 'yellow pepper', 'duck', 'eggplant', 'glass ware', 'sewing machine',
               'rolled up rug', 'doily', 'coffee pot', 'torah']
 
-NYU_TARGET_CATEGORIES = ['bathtub', 'bed', 'bookshelf', 'box', 'chair', 'counter', 'desk', 'door', 'dresser',
+NYU_TARGET_CATEGORIES = ['bed', 'bookshelf', 'chair', 'counter', 'desk', 'door', 'dresser',
                          'garbage bin', 'lamp', 'monitor', 'night stand', 'pillow', 'sink', 'sofa', 'table',
                          'television', 'toilet']
 

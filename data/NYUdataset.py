@@ -129,10 +129,13 @@ class NYUYoloDataset(Dataset):
                 train_transforms, test_transforms = get_train_test_transforms_list({"depth": "image"})
             else:
                 train_transforms, test_transforms = get_train_test_transforms_list()
-
-            augmentations = train_transforms(image=image, depth=depth, bboxes=bboxes)
+            
+            if self.train_mode == "fusion":
+                augmentations = train_transforms(image=image, depth=depth, bboxes=bboxes)
+                depth = augmentations["depth"]
+            else:
+                augmentations = train_transforms(image=image, bboxes=bboxes)
             image = augmentations["image"]
-            depth = augmentations["depth"]
             bboxes = augmentations["bboxes"]
 
         # Prepare YOLO targets

@@ -31,7 +31,7 @@ def get_train_test_transforms_list(additional_targets=None):
             ToTensorV2(),
         ]
 
-    if additional_targets is False:
+    if additional_targets is None:
         # These transformations can be applied only when pixel values are integers
         train_transforms_list.extend([
             A.CLAHE(p=0.1),
@@ -41,6 +41,16 @@ def get_train_test_transforms_list(additional_targets=None):
             A.Normalize(mean=[0, 0, 0], std=[1, 1, 1], max_pixel_value=255, ),
             ToTensorV2(),
         ])
+        train_transforms = A.Compose(
+            train_transforms_list,
+            bbox_params=A.BboxParams(
+                format="yolo", min_visibility=0.4, label_fields=[], ),
+        )
+        test_transforms = A.Compose(
+            test_transforms_list,
+            bbox_params=A.BboxParams(
+                format="yolo", min_visibility=0.4, label_fields=[]),
+        )
     else:
         # to ensure the correct order of transformations are being applied to the image
         # we are separating out these transformations
@@ -49,19 +59,19 @@ def get_train_test_transforms_list(additional_targets=None):
             A.Normalize(mean=[0, 0, 0], std=[1, 1, 1], max_pixel_value=255, ),
             ToTensorV2(),
         ])
+        train_transforms = A.Compose(
+            train_transforms_list,
+            bbox_params=A.BboxParams(
+                format="yolo", min_visibility=0.4, label_fields=[], ),
+            additional_targets=additional_targets,
+        )
+        test_transforms = A.Compose(
+            test_transforms_list,
+            bbox_params=A.BboxParams(
+                format="yolo", min_visibility=0.4, label_fields=[]),
+            additional_targets=additional_targets,
+        )
 
-    train_transforms = A.Compose(
-        train_transforms_list,
-        bbox_params=A.BboxParams(
-            format="yolo", min_visibility=0.4, label_fields=[], ),
-        additional_targets=additional_targets,
-    )
 
-    test_transforms = A.Compose(
-        test_transforms_list,
-        bbox_params=A.BboxParams(
-            format="yolo", min_visibility=0.4, label_fields=[]),
-        additional_targets=additional_targets,
-    )
 
     return train_transforms, test_transforms
