@@ -4,13 +4,24 @@ from torchvision import transforms
 from models.yolov3 import YOLOv3
 from utils.utils import *
 
-# Load weights
-config_file_path = "./weights/yolov3.cfg"
-weights_file_path = "./weights/yolov3.weights"
+model_type = str(input("Enter model type to train (yolov3 or resyolov3): "))
 
-model = ResYOLOv3(num_classes=config.NUM_CLASSES)
+if model_type == "resyolov3":
+    model = ResYOLOv3(num_classes=config.NUM_CLASSES).to("cpu")
+elif model_type == "yolov3":
+    model = YOLOv3(num_classes=config.NUM_CLASSES).to("cpu")
+else:
+    raise NotImplementedError
 
-load_checkpoint(os.path.join(config.CHECKPOINT_DIR, "rgb_hha_resnet_concat_addn_50_0_5_ckpt.pth.tar"), model)
+checkpoint_path = None
+try:
+    checkpoint_path = os.path.join(config.CHECKPOINT_DIR, "Experiment_4.pth.tar")
+    checkpoint = load_checkpoint(checkpoint_path, model)
+except TypeError as e:
+    raise TypeError(
+        f"Failed to load checkpoint from '{checkpoint_path}'. Ensure the model architecture matches the checkpoint. "
+        f"Error: {e}"
+    )
 
 # Switch to evaluation mode
 model.eval()
@@ -24,8 +35,8 @@ transform = transforms.Compose([
     transforms.Resize((416, 416)),
     transforms.ToTensor(),
 ])
-input_tensor = transform(image).unsqueeze(0)
-hha_tensor = transform(hha).unsqueeze(0)
+input_tensor = transform(image).unsqueeze(0).to("cpu")
+hha_tensor = transform(hha).unsqueeze(0).to("cpu")
 
 # Inference
 with torch.no_grad():
@@ -39,6 +50,3 @@ with torch.no_grad():
 
     nms_bboxes_all_scales = non_max_suppression(bboxes_all_scales, iou_threshold=1, threshold=0.7, box_format="corners")
     plot_image(image, nms_bboxes_all_scales)
-
-
-
