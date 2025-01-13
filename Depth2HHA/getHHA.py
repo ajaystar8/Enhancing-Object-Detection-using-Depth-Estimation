@@ -1,13 +1,13 @@
-# --*-- coding:utf-8 --*--
-import math
+import glob
+
 import cv2
 import os
 import math
 from tqdm import tqdm
 from multiprocessing import Pool
 
-from utils.rgbd_util import *
-from utils.getCameraParam import *
+from hha_utils.rgbd_util import *
+from hha_utils.getCameraParam import *
 
 '''
 must use 'COLOR_BGR2GRAY' here, or you will get a different gray-value with what MATLAB gets.
@@ -67,22 +67,28 @@ def getHHA(C, D, RD):
 
 def generate_hha(idx):
     # generate hha for the i-th image
-    root = '../../NYUD/'
+    root = '../NYUD/'
 
     D, RD = getImage(idx, root)
     camera_matrix = getCameraParam('color')
     hha_complete = getHHA(camera_matrix, D, D)
-    cv2.imwrite(f'hha/{idx}.png', hha_complete)
+    print(os.path.join(root, "hha", f"{idx}.png"))
+
+    cv2.imwrite(os.path.join(root, "hha", f"{idx}.png"), hha_complete)
+    # cv2.imwrite(f'hha/{idx}.png', hha_complete)
     print("image written")
 
 
 if __name__ == "__main__":
-    root = '../../NYUD/'
+    root = '../NYUD/'
+    os.makedirs(os.path.join("..", "NYUD", "hha"), exist_ok=True)
+
+    total_images_num = len(glob.glob(os.path.join(root, "depth", "*.png")))
 
     processNum = 16
     pool = Pool(processNum)
 
-    for idx in tqdm(range(len(os.listdir(os.path.join(root, 'depth'))))):
+    for idx in tqdm(range(total_images_num)):
         print(idx)
         pool.apply_async(generate_hha, args=(idx,))
 

@@ -1,30 +1,37 @@
-import albumentations as A
-import cv2
+import os
 import torch
 
-from albumentations.pytorch import ToTensorV2
+DATASET = 'NYUD'
+DEVICE = "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu"
 
-DATASET = 'NYUv2'
-DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-# seed_everything()  # If you want deterministic behavior
-NUM_WORKERS = 0  # For some reason, num_workers > 0 causes an error on my machine
+NUM_WORKERS = 0
 BATCH_SIZE = 8
 IMAGE_SIZE = 416
-# Moved NUM_CLASSES to the end of the file to get the length of the classes list
+
 LEARNING_RATE = 1e-5
 WEIGHT_DECAY = 1e-4
-NUM_EPOCHS = 100
-CONF_THRESHOLD = 0.05
+NUM_EPOCHS = 50
+CONF_THRESHOLD = 0.5
 MAP_IOU_THRESH = 0.5
 NMS_IOU_THRESH = 0.45
 S = [IMAGE_SIZE // 32, IMAGE_SIZE // 16, IMAGE_SIZE // 8]
+
 PIN_MEMORY = True
 LOAD_MODEL = False
-SAVE_MODEL = True
-CHECKPOINT_FILE = "checkpoint.pth.tar"
-IMG_DIR = DATASET + "/images/"
-LABEL_DIR = DATASET + "/labels/"
+SAVE_MODEL = False
+
+CHECKPOINT_DIR = os.path.join(os.getcwd(), "checkpoints")
+RGB_IMG_DIR = os.path.join(DATASET, "images")
+RGB_LABEL_DIR = os.path.join(DATASET, "labels")
+
+HHA_IMAGE_DIR = os.path.join(DATASET, "hha")
 NYU_PATH = "./resources/nyu_depth_v2_labeled.mat"
+PLOTS_DIR = os.path.join("plots")
+TRAIN_LOGS = os.path.join("training_logs")
+
+# YOLOv3 specific
+CONFIG_FILE_PATH = "./weights/yolov3.cfg"
+WEIGHTS_FILE_PATH = "./weights/yolov3.weights"
 
 '''
 In YoLov3, there are three prediction scale, where each predication scale has three anchor boxes. This means that
@@ -44,159 +51,7 @@ ANCHORS = [
 ]
 
 scale = 1.1
-train_transforms = A.Compose(
-    [
-        A.LongestMaxSize(max_size=int(IMAGE_SIZE * scale)),
-        A.PadIfNeeded(
-            min_height=int(IMAGE_SIZE * scale),
-            min_width=int(IMAGE_SIZE * scale),
-            border_mode=cv2.BORDER_CONSTANT,
-            value=0
-        ),
-        A.RandomCrop(width=IMAGE_SIZE, height=IMAGE_SIZE),
-        A.ColorJitter(brightness=0.6, contrast=0.6,
-                      saturation=0.6, hue=0.6, p=0.4),
-        A.HorizontalFlip(p=0.5),
-        A.Blur(p=0.1),
-        A.CLAHE(p=0.1),
-        A.Posterize(p=0.1),
-        A.ToGray(p=0.1),
-        A.ChannelShuffle(p=0.05),
-        A.Normalize(mean=[0, 0, 0], std=[1, 1, 1], max_pixel_value=255, ),
-        ToTensorV2(),
-    ],
-    bbox_params=A.BboxParams(
-        format="yolo", min_visibility=0.4, label_fields=[], ),
-)
-test_transforms = A.Compose(
-    [
-        A.LongestMaxSize(max_size=IMAGE_SIZE),
-        A.PadIfNeeded(
-            min_height=IMAGE_SIZE, min_width=IMAGE_SIZE, border_mode=cv2.BORDER_CONSTANT, value=0
-        ),
-        A.Normalize(mean=[0, 0, 0], std=[1, 1, 1], max_pixel_value=255, ),
-        ToTensorV2(),
-    ],
-    bbox_params=A.BboxParams(
-        format="yolo", min_visibility=0.4, label_fields=[]),
-)
 
-PASCAL_CLASSES = [
-    "aeroplane",
-    "bicycle",
-    "bird",
-    "boat",
-    "bottle",
-    "bus",
-    "car",
-    "cat",
-    "chair",
-    "cow",
-    "diningtable",
-    "dog",
-    "horse",
-    "motorbike",
-    "person",
-    "pottedplant",
-    "sheep",
-    "sofa",
-    "train",
-    "tvmonitor"
-]
-
-COCO_LABELS = ['person',
-               'bicycle',
-               'car',
-               'motorcycle',
-               'airplane',
-               'bus',
-               'train',
-               'truck',
-               'boat',
-               'traffic light',
-               'fire hydrant',
-               'stop sign',
-               'parking meter',
-               'bench',
-               'bird',
-               'cat',
-               'dog',
-               'horse',
-               'sheep',
-               'cow',
-               'elephant',
-               'bear',
-               'zebra',
-               'giraffe',
-               'backpack',
-               'umbrella',
-               'handbag',
-               'tie',
-               'suitcase',
-               'frisbee',
-               'skis',
-               'snowboard',
-               'sports ball',
-               'kite',
-               'baseball bat',
-               'baseball glove',
-               'skateboard',
-               'surfboard',
-               'tennis racket',
-               'bottle',
-               'wine glass',
-               'cup',
-               'fork',
-               'knife',
-               'spoon',
-               'bowl',
-               'banana',
-               'apple',
-               'sandwich',
-               'orange',
-               'broccoli',
-               'carrot',
-               'hot dog',
-               'pizza',
-               'donut',
-               'cake',
-               'chair',
-               'couch',
-               'potted plant',
-               'bed',
-               'dining table',
-               'toilet',
-               'tv',
-               'laptop',
-               'mouse',
-               'remote',
-               'keyboard',
-               'cell phone',
-               'microwave',
-               'oven',
-               'toaster',
-               'sink',
-               'refrigerator',
-               'book',
-               'clock',
-               'vase',
-               'scissors',
-               'teddy bear',
-               'hair drier',
-               'toothbrush'
-               ]
-
-'''
-Got with the following code: 
-import h5py
-
-# Load the NYU Depth Dataset .mat file
-mat_file = "./resources/nyu_depth_v2_labeled.mat"
-with h5py.File(mat_file, "r") as f:
-    # Dereference each object in `names` and decode with UTF-16
-    names = [f[ref][()].tobytes().decode("utf-16").strip() for ref in f["names"][0]]
-    print(f"Class Names: {names}")
-'''
 NYU_LABELS = ['book', 'bottle', 'cabinet', 'ceiling', 'chair', 'cone', 'counter', 'dishwasher', 'faucet',
               'fire extinguisher', 'floor', 'garbage bin', 'microwave', 'paper towel dispenser', 'paper', 'pot',
               'refridgerator', 'stove burner', 'table', 'unknown', 'wall', 'bowl', 'magnet', 'sink', 'air vent', 'box',
@@ -324,4 +179,8 @@ NYU_LABELS = ['book', 'bottle', 'cabinet', 'ceiling', 'chair', 'cone', 'counter'
               'hammer', 'matchbox', 'pepper', 'yellow pepper', 'duck', 'eggplant', 'glass ware', 'sewing machine',
               'rolled up rug', 'doily', 'coffee pot', 'torah']
 
-NUM_CLASSES = 20 if DATASET != 'NYUv2' else NYU_LABELS.__len__()
+NYU_TARGET_CATEGORIES = ['bed', 'bookshelf', 'chair', 'counter', 'desk', 'door', 'dresser',
+                         'garbage bin', 'lamp', 'monitor', 'night stand', 'pillow', 'sink', 'sofa', 'table',
+                         'television', 'toilet']
+
+NUM_CLASSES = NYU_TARGET_CATEGORIES.__len__()

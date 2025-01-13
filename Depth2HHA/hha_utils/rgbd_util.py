@@ -1,6 +1,8 @@
 # --*-- coding:utf-8 --*--
 import numpy as np
-from util import *
+
+from Depth2HHA.hha_utils.util import filterItChopOff, invertIt, mutiplyIt, getRMatrix, getYDir, rotatePC
+from utils import *
 
 np.seterr(divide='ignore', invalid='ignore')
 
@@ -84,7 +86,7 @@ def getPointCloudFromZ(Z, C, s=1):
   
 Input:
     depthImage: in meters
-    missingMask:  boolean mask of what data was missing
+    missingMask:  boolean mask of what PASCAL was missing
     R: radius of clipping
     sc: to upsample or not
     superpixels:  superpixel map to define bounadaries that should

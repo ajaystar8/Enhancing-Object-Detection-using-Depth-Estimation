@@ -1,23 +1,25 @@
-import config
-import torch
-import torch.optim as optim
+import json
 import os
 
-from load_weights import load_darknet_weights
-from model import YOLOv3
+import torch
+import torch.optim as optim
 from tqdm import tqdm
-from utils import (
+
+import config
+from loss import YoloLoss
+from models.resyolov3 import ResYOLOv3
+from models.resyolov3depth import ResYOLOv3Depth
+from models.yolov3 import YOLOv3
+from utils.load_weights import LoadYOLOWeights
+from utils.utils import (
     mean_average_precision,
-    cells_to_bboxes,
     get_evaluation_bboxes,
     save_checkpoint,
     load_checkpoint,
     check_class_accuracy,
-    get_loaders,
-    plot_couple_examples,
-    get_loaders_nyu
+    get_loaders_nyu,
+    seed_everything
 )
-from loss import YoloLoss
 
 
 def train_fn(train_loader, model, optimizer, loss_fn, scaled_anchors):
@@ -25,20 +27,20 @@ def train_fn(train_loader, model, optimizer, loss_fn, scaled_anchors):
     losses = []
 
     for batch_idx, (x, y) in enumerate(loop):
-        x = x.to(config.DEVICE)
+        image, depth = x[:, 0:3, :, :], x[:, 3:, :, :]
+        image = image.to(config.DEVICE)
+        if depth is not None:
+            depth = depth.to(config.DEVICE)
+
         y0, y1, y2 = (
             y[0].to(config.DEVICE),
             y[1].to(config.DEVICE),
             y[2].to(config.DEVICE)
         )
-        print(f"y[0]: {y[0].shape}")
-        print(f"y[1]: {y[1].shape}")
-        print(f"y[2]: {y[2].shape}")
-
-        out = model(x)
-        print("Output shapes")
-        for item in out:
-            print(item.shape)
+        if isinstance(model, ResYOLOv3):
+            out = model(image, depth)
+        else:
+            out = model(image)
 
         loss = (
                 loss_fn(out[0], y0, scaled_anchors[0]) +
@@ -54,25 +56,41 @@ def train_fn(train_loader, model, optimizer, loss_fn, scaled_anchors):
         mean_loss = sum(losses) / len(losses)
         loop.set_postfix(loss=mean_loss)
 
+    return mean_loss
+
 
 def main():
-    model = YOLOv3(num_classes=config.NUM_CLASSES).to(config.DEVICE)
-    # TODO: Fix loading of pre-trained weights
-    # load_darknet_weights(model, "./weights/yolov3.weights")
+    model_type = str(input("Enter model type to train (yolov3 or resyolov3_add or resyolov3_depth): "))
+
+    if model_type == "resyolov3_add":
+        model = ResYOLOv3(num_classes=config.NUM_CLASSES).to(config.DEVICE)
+    elif model_type == "resyolov3_depth":
+        model = ResYOLOv3Depth(num_classes=config.NUM_CLASSES).to(config.DEVICE)
+    elif model_type == "yolov3":
+        model = YOLOv3(num_classes=config.NUM_CLASSES).to(config.DEVICE)
+    else:
+        raise NotImplementedError
+
+    # Load pretrained weights
+    weight_loader = LoadYOLOWeights(config.CONFIG_FILE_PATH, config.WEIGHTS_FILE_PATH)
+    weight_loader.load(model)
+
+    # Freeze weights
+    # model.freeze_backbone_weights()
+
     optimizer = optim.Adam(
         model.parameters(), lr=config.LEARNING_RATE, weight_decay=config.WEIGHT_DECAY
     )
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=50)
+
     loss_fn = YoloLoss()
 
-    train_loader, test_loader, train_eval_loader = get_loaders(
-        train_csv_path=config.DATASET + "/train.csv", test_csv_path=config.DATASET + "/test.csv"
-    ) if not config.DATASET == 'NYUv2' else get_loaders_nyu(
-        mat_file_path=config.NYU_PATH
-    )
+    train_mode = str(input("Enter train mode (rgb or hha or fusion): "))
+    train_loader, test_loader, train_eval_loader = get_loaders_nyu(mat_file_path=config.NYU_PATH, train_mode=train_mode)
 
     if config.LOAD_MODEL:
         load_checkpoint(
-            config.CHECKPOINT_FILE, model, optimizer, config.LEARNING_RATE
+            os.path.join(config.CHECKPOINT_DIR, "initial_ckpt.pth.tar"), model, optimizer
         )
 
     # Scale anchors to each prediction scale
@@ -81,15 +99,34 @@ def main():
             * torch.tensor(config.S).unsqueeze(1).unsqueeze(1).repeat(1, 3, 2)
     ).to(config.DEVICE)
 
+    best_map_till_now = -1
+    training_history = {"loss": [], "class_acc": [], "obj_acc": [], "noobj_acc": [], "map": [],
+                        "ap_per_class": [], "predicted_boxes": []}
+    train_log_file_name = str(input("Enter filename to store training logs (include .json): "))
+    model_ckpt_name = str(input("Enter model checkpoint name (include .pth.tar): "))
+
+    print("Training started!")
+
+    # Define the subfolder for saving the training history
+    subfolder = os.path.join("training_logs")
+    os.makedirs(subfolder, exist_ok=True)
+
     for epoch in range(config.NUM_EPOCHS):
-        train_fn(train_loader, model, optimizer, loss_fn, scaled_anchors)
+        print(f"--------[EPOCH-{epoch + 1}]-------------")
+        epoch_loss = train_fn(train_loader, model, optimizer, loss_fn, scaled_anchors)
+        training_history["loss"].append({f"Epoch-{epoch + 1}": epoch_loss})
+        scheduler.step()
 
-        if config.SAVE_MODEL:
-            save_checkpoint(model, optimizer, filename=f"checkpoint.pth.tar")
+        if best_map_till_now < 0:
+            save_checkpoint(model, optimizer, filename=f"initial_ckpt.pth.tar")
 
-        if epoch % 10 == 0 and epoch > 0:
-            print("On Test loader:")
-            check_class_accuracy(model, test_loader, threshold=config.CONF_THRESHOLD)
+        print("On Test loader:")
+        class_acc, obj_acc, noobj_acc = check_class_accuracy(model, test_loader, threshold=config.CONF_THRESHOLD)
+        training_history["class_acc"].append({f"Epoch-{epoch + 1}": class_acc.item()})
+        training_history["obj_acc"].append({f"Epoch-{epoch + 1}": obj_acc.item()})
+        training_history["noobj_acc"].append({f"Epoch-{epoch + 1}": noobj_acc.item()})
+
+        if epoch >= 10 or config.LOAD_MODEL:
             # Run model on test set and convert outputs to bounding boxes relative to image
             pred_boxes, true_boxes = get_evaluation_bboxes(
                 test_loader,
@@ -97,17 +134,38 @@ def main():
                 iou_threshold=config.NMS_IOU_THRESH,
                 anchors=config.ANCHORS,
                 threshold=config.CONF_THRESHOLD,
+                device=config.DEVICE
             )
-            # Compute mean average precision 
-            mapval = mean_average_precision(
+            print(len(pred_boxes))
+            training_history["predicted_boxes"].append({f"Epoch-{epoch + 1}": len(pred_boxes)})
+            # Compute mean average precision
+            mapval, ap_per_class = mean_average_precision(
                 pred_boxes,
                 true_boxes,
                 iou_threshold=config.MAP_IOU_THRESH,
                 box_format="midpoint",
                 num_classes=config.NUM_CLASSES,
             )
-            print(f"MAP: {mapval.item()}")
+            training_history["map"].append({f"Epoch-{epoch + 1}": mapval})
+            training_history["ap_per_class"].append({f"Epoch-{epoch + 1}": ap_per_class})
+            if mapval > best_map_till_now:
+                print(
+                    "Model performance improved from {:.2f}% to {:.2f}%!".format(best_map_till_now * 100, mapval * 100))
+                best_map_till_now = mapval
+                save_checkpoint(model, optimizer, filename=model_ckpt_name)
+            print(f"MAP: {mapval}")
+        else:
+            # Append None to history if no evaluation is done
+            training_history["map"].append({f"Epoch-{epoch + 1}": None})
+            training_history["ap_per_class"].append({f"Epoch-{epoch + 1}": None})
+
+        # Save the training history to a file
+        history_file_path = os.path.join(subfolder, train_log_file_name)
+        with open(history_file_path, "w") as f:
+            json.dump(training_history, f)
 
 
 if __name__ == "__main__":
+    config.LOAD_MODEL = False
+    seed_everything()
     main()

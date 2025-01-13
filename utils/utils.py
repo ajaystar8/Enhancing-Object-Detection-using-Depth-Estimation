@@ -6,10 +6,15 @@ import matplotlib.patches as patches
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
+import torch.nn as nn
+import torchvision
 from torch.utils.data import DataLoader
+from torchmetrics.detection.mean_ap import MeanAveragePrecision
 from tqdm import tqdm
 
 import config
+from models.resyolov3 import ResYOLOv3
+from models.resyolov3depth import ResYOLOv3Depth
 
 
 def iou_width_height(boxes1, boxes2):
@@ -122,6 +127,17 @@ def non_max_suppression(bboxes, iou_threshold, threshold, box_format="corners"):
     return bboxes_after_nms
 
 
+def mean_average_precision_optimized(pred_boxes, true_boxes):
+    # Initialize the metric
+    metric = MeanAveragePrecision(iou_type="bbox", iou_thresholds=[0.5])
+
+    # Update with predictions and ground truths
+    metric.update(pred_boxes, true_boxes)
+
+    # Compute and return the final mAP
+    return metric.compute()
+
+
 def mean_average_precision(
         pred_boxes, true_boxes, iou_threshold=0.5, box_format="midpoint", num_classes=20
 ):
@@ -173,7 +189,7 @@ def mean_average_precision(
 
         # We then go through each key, val in this dictionary
         # and convert to the following (w.r.t same example):
-        # ammount_bboxes = {0:torch.tensor[0,0,0], 1:torch.tensor[0,0,0,0,0]}
+        # amount_bboxes = {0:torch.tensor[0,0,0], 1:torch.tensor[0,0,0,0,0]}
         for key, val in amount_bboxes.items():
             amount_bboxes[key] = torch.zeros(val)
 
@@ -228,21 +244,21 @@ def mean_average_precision(
         precisions = torch.cat((torch.tensor([1]), precisions))
         recalls = torch.cat((torch.tensor([0]), recalls))
         # torch.trapz for numerical integration
-        average_precisions.append(torch.trapz(precisions, recalls))
+        average_precisions.append({f"{config.NYU_TARGET_CATEGORIES[c]}":
+                                       float(torch.trapz(precisions, recalls).item())})
 
-    return sum(average_precisions) / len(average_precisions)
+    sum_average_precision = 0.0
+    for item in average_precisions:
+        sum_average_precision += list(item.values())[0]
+    map_score = sum_average_precision / len(average_precisions)
+
+    return map_score, average_precisions
 
 
 def plot_image(image, boxes):
     """Plots predicted bounding boxes on the image"""
     cmap = plt.get_cmap("tab20b")
-    if config.DATASET == 'COCO':
-        class_labels = config.COCO_LABELS
-    elif config.DATASET == 'NYUv2':
-        class_labels = config.NYU_LABELS
-    else:
-        class_labels = config.PASCAL_CLASSES
-    print(class_labels.__len__())
+    class_labels = config.NYU_TARGET_CATEGORIES
     colors = [cmap(i) for i in np.linspace(0, 1, len(class_labels))]
     im = np.array(image)
     height, width, _ = im.shape
@@ -291,7 +307,7 @@ def get_evaluation_bboxes(
         anchors,
         threshold,
         box_format="midpoint",
-        device="cuda",
+        device=config.DEVICE,
 ):
     # make sure model is in eval before get bboxes
     model.eval()
@@ -299,12 +315,18 @@ def get_evaluation_bboxes(
     all_pred_boxes = []
     all_true_boxes = []
     for batch_idx, (x, labels) in enumerate(tqdm(loader)):
-        x = x.to(device)
+        image, depth = x[:, 0:3, :, :], x[:, 3:, :, :]
+        image = image.to(config.DEVICE)
+        if depth is not None:
+            depth = depth.to(config.DEVICE)
 
         with torch.no_grad():
-            predictions = model(x)
+            if isinstance(model, ResYOLOv3) or isinstance(model, ResYOLOv3Depth):
+                predictions = model(image, depth)
+            else:
+                predictions = model(image)
 
-        batch_size = x.shape[0]
+        batch_size = image.shape[0]
         bboxes = [[] for _ in range(batch_size)]
         for i in range(3):
             S = predictions[i].shape[2]
@@ -388,9 +410,16 @@ def check_class_accuracy(model, loader, threshold):
     tot_obj, correct_obj = 0, 0
 
     for idx, (x, y) in enumerate(tqdm(loader)):
-        x = x.to(config.DEVICE)
+        image, depth = x[:, 0:3, :, :], x[:, 3:, :, :]
+        image = image.to(config.DEVICE)
+        if depth is not None:
+            depth = depth.to(config.DEVICE)
+
         with torch.no_grad():
-            out = model(x)
+            if isinstance(model, ResYOLOv3):
+                out = model(image, depth)
+            else:
+                out = model(image)
 
         for i in range(3):
             y[i] = y[i].to(config.DEVICE)
@@ -408,128 +437,55 @@ def check_class_accuracy(model, loader, threshold):
             correct_noobj += torch.sum(obj_preds[noobj] == y[i][..., 0][noobj])
             tot_noobj += torch.sum(noobj)
 
-    print(f"Class accuracy is: {(correct_class / (tot_class_preds + 1e-16)) * 100:2f}%")
-    print(f"No obj accuracy is: {(correct_noobj / (tot_noobj + 1e-16)) * 100:2f}%")
-    print(f"Obj accuracy is: {(correct_obj / (tot_obj + 1e-16)) * 100:2f}%")
+    class_acc = correct_class / (tot_class_preds + 1e-16)
+    obj_acc = correct_obj / (tot_obj + 1e-16)
+    noobj_acc = correct_noobj / (tot_noobj + 1e-16)
+
+    print(f"Class accuracy is: {class_acc * 100:.2f}%")
+    print(f"No obj accuracy is: {noobj_acc * 100:2f}%")
+    print(f"Obj accuracy is: {obj_acc * 100:2f}%")
     model.train()
 
-
-def get_mean_std(loader):
-    # var[X] = E[X**2] - E[X]**2
-    channels_sum, channels_sqrd_sum, num_batches = 0, 0, 0
-
-    for data, _ in tqdm(loader):
-        channels_sum += torch.mean(data, dim=[0, 2, 3])
-        channels_sqrd_sum += torch.mean(data ** 2, dim=[0, 2, 3])
-        num_batches += 1
-
-    mean = channels_sum / num_batches
-    std = (channels_sqrd_sum / num_batches - mean ** 2) ** 0.5
-
-    return mean, std
+    return class_acc, obj_acc, noobj_acc
 
 
-def save_checkpoint(model, optimizer, filename="my_checkpoint.pth.tar"):
-    print("=> Saving checkpoint")
-    checkpoint = {
-        "state_dict": model.state_dict(),
-        "optimizer": optimizer.state_dict(),
-    }
-    torch.save(checkpoint, filename)
+def save_checkpoint(model, learning_rate, optimizer=None, filename="my_checkpoint.pth.tar", save_dir="checkpoints"):
+    """
+    Saves the model state and optionally the optimizer state to a checkpoint.
+
+    Args:
+        model (torch.nn.Module): Model to save the state from.
+        optimizer (torch.optim.Optimizer, optional): Optimizer to save the state (default: None).
+        filename (str): Name of the checkpoint file (default: 'my_checkpoint.pth.tar').
+        save_dir (str): Directory to save the checkpoint file (default: '../checkpoints').
+    """
+    os.makedirs(os.path.join(".", save_dir), exist_ok=True)
+
+    print(f"=> Saving checkpoint to {os.path.join(save_dir, filename)}")
+    checkpoint = {"state_dict": model.state_dict(), 'learning_rate': learning_rate}
+    if optimizer:
+        checkpoint["optimizer"] = optimizer.state_dict()
+    torch.save(checkpoint, os.path.join(save_dir, filename))
+    print("Checkpoint saved successfully!")
 
 
-def load_checkpoint(checkpoint_file, model, optimizer, lr):
-    print("=> Loading checkpoint")
-    checkpoint = torch.load(checkpoint_file, map_location=config.DEVICE)
+def load_checkpoint(checkpoint_file, model, optimizer=None, device='cpu'):
+    """
+    Loads model state and optionally optimizer state from a checkpoint.
+
+    Args:
+        checkpoint_file (str): Path to the checkpoint file.
+        model (torch.nn.Module): Model to load the state into.
+        optimizer (torch.optim.Optimizer, optional): Optimizer to restore the state (default: None).
+        device (str): Device to map the checkpoint (default: 'cpu').
+    """
+    print(f"=> Loading checkpoint from {checkpoint_file}")
+    checkpoint = torch.load(checkpoint_file, map_location=device, weights_only=False)
     model.load_state_dict(checkpoint["state_dict"])
-    optimizer.load_state_dict(checkpoint["optimizer"])
-
-    # If we don't do this then it will just have learning rate of old checkpoint
-    # and it will lead to many hours of debugging \:
-    for param_group in optimizer.param_groups:
-        param_group["lr"] = lr
-
-
-def get_loaders(train_csv_path, test_csv_path):
-    from dataset import YOLODataset
-
-    IMAGE_SIZE = config.IMAGE_SIZE
-    train_dataset = YOLODataset(
-        train_csv_path,
-        transform=config.train_transforms,
-        S=[IMAGE_SIZE // 32, IMAGE_SIZE // 16, IMAGE_SIZE // 8],
-        img_dir=config.IMG_DIR,
-        label_dir=config.LABEL_DIR,
-        anchors=config.ANCHORS,
-    )
-    test_dataset = YOLODataset(
-        test_csv_path,
-        transform=config.test_transforms,
-        S=[IMAGE_SIZE // 32, IMAGE_SIZE // 16, IMAGE_SIZE // 8],
-        img_dir=config.IMG_DIR,
-        label_dir=config.LABEL_DIR,
-        anchors=config.ANCHORS,
-    )
-    train_loader = DataLoader(
-        dataset=train_dataset,
-        batch_size=config.BATCH_SIZE,
-        num_workers=config.NUM_WORKERS,
-        pin_memory=config.PIN_MEMORY,
-        shuffle=True,
-        drop_last=False,
-    )
-    test_loader = DataLoader(
-        dataset=test_dataset,
-        batch_size=config.BATCH_SIZE,
-        num_workers=config.NUM_WORKERS,
-        pin_memory=config.PIN_MEMORY,
-        shuffle=False,
-        drop_last=False,
-    )
-
-    train_eval_dataset = YOLODataset(
-        train_csv_path,
-        transform=config.test_transforms,
-        S=[IMAGE_SIZE // 32, IMAGE_SIZE // 16, IMAGE_SIZE // 8],
-        img_dir=config.IMG_DIR,
-        label_dir=config.LABEL_DIR,
-        anchors=config.ANCHORS,
-    )
-    train_eval_loader = DataLoader(
-        dataset=train_eval_dataset,
-        batch_size=config.BATCH_SIZE,
-        num_workers=config.NUM_WORKERS,
-        pin_memory=config.PIN_MEMORY,
-        shuffle=False,
-        drop_last=False,
-    )
-
-    return train_loader, test_loader, train_eval_loader
-
-
-def plot_couple_examples(model, loader, thresh, iou_thresh, anchors):
-    model.eval()
-    x, y = next(iter(loader))
-    x = x.to("cuda")
-    with torch.no_grad():
-        out = model(x)
-        bboxes = [[] for _ in range(x.shape[0])]
-        for i in range(3):
-            batch_size, A, S, _, _ = out[i].shape
-            anchor = anchors[i]
-            boxes_scale_i = cells_to_bboxes(
-                out[i], anchor, S=S, is_preds=True
-            )
-            for idx, (box) in enumerate(boxes_scale_i):
-                bboxes[idx] += box
-
-        model.train()
-
-    for i in range(batch_size):
-        nms_boxes = non_max_suppression(
-            bboxes[i], iou_threshold=iou_thresh, threshold=thresh, box_format="midpoint",
-        )
-        plot_image(x[i].permute(1, 2, 0).detach().cpu(), nms_boxes)
+    if optimizer and "optimizer" in checkpoint:
+        optimizer.load_state_dict(checkpoint["optimizer"])
+        print("=> Optimizer state restored")
+    print("Checkpoint loaded successfully!")
 
 
 def generate_train_test_indices(num_samples, train_ratio=0.8):
@@ -554,57 +510,68 @@ def generate_train_test_indices(num_samples, train_ratio=0.8):
     return train_indices, test_indices
 
 
-def get_loaders_nyu(mat_file_path, train_ratio=0.8):
+def get_loaders_nyu(mat_file_path, train_mode, train_ratio=0.8):
     """
-    Creates data loaders for the NYU Depth Dataset with a train-test split.
+    Creates PASCAL loaders for the NYU Depth Dataset with a train-test split.
 
     Args:
         mat_file_path (str): Path to the .mat file containing the NYU dataset.
+        train_mode: if the model is to be trained on rgb PASCAL, hha PASCAL or both(fusion)
         train_ratio (float): Proportion of the dataset to use for training.
 
     Returns:
-        train_loader (DataLoader): DataLoader for training data.
-        test_loader (DataLoader): DataLoader for testing data.
-        train_eval_loader (DataLoader): DataLoader for evaluating training data.
+        train_loader (DataLoader): DataLoader for training PASCAL.
+        test_loader (DataLoader): DataLoader for testing PASCAL.
+        train_eval_loader (DataLoader): DataLoader for evaluating training PASCAL.
     """
+    from data.NYUYoloDataset import NYUYoloDataset
+    from utils.transforms import get_train_test_transforms_list
+
     # Load the number of samples in the dataset
     import h5py
     with h5py.File(mat_file_path, "r") as f:
         num_samples = len(f["images"])
 
-    # Import the necessary classes and functions
-    from NYUdataset import NYUYoloDataset
-
     # Generate train and test indices
     train_indices, test_indices = generate_train_test_indices(num_samples, train_ratio)
 
     # Create training and testing datasets
+    train_transforms, test_transforms = get_train_test_transforms_list()
     train_dataset = NYUYoloDataset(
         mat_file=mat_file_path,
+        hha_dir=config.HHA_IMAGE_DIR,
         anchors=config.ANCHORS,
         image_size=config.IMAGE_SIZE,
         S=[config.IMAGE_SIZE // 32, config.IMAGE_SIZE // 16, config.IMAGE_SIZE // 8],
         C=40,
-        transform=config.train_transforms,
+        apply_transforms=True,
         indices=train_indices,
+        use_only_target_categories=True,
+        train_mode=train_mode
     )
     test_dataset = NYUYoloDataset(
         mat_file=mat_file_path,
+        hha_dir=config.HHA_IMAGE_DIR,
         anchors=config.ANCHORS,
         image_size=config.IMAGE_SIZE,
         S=[config.IMAGE_SIZE // 32, config.IMAGE_SIZE // 16, config.IMAGE_SIZE // 8],
         C=40,
-        transform=config.test_transforms,
+        apply_transforms=True,
         indices=test_indices,
+        use_only_target_categories=True,
+        train_mode=train_mode
     )
     train_eval_dataset = NYUYoloDataset(
         mat_file=mat_file_path,
+        hha_dir=config.HHA_IMAGE_DIR,
         anchors=config.ANCHORS,
         image_size=config.IMAGE_SIZE,
         S=[config.IMAGE_SIZE // 32, config.IMAGE_SIZE // 16, config.IMAGE_SIZE // 8],
         C=40,
-        transform=config.test_transforms,
+        apply_transforms=True,
         indices=train_indices,
+        use_only_target_categories=True,
+        train_mode=train_mode
     )
 
     # Create DataLoaders
@@ -636,6 +603,13 @@ def get_loaders_nyu(mat_file_path, train_ratio=0.8):
     return train_loader, test_loader, train_eval_loader
 
 
+def get_nyu_target_category_indices():
+    """
+    Returns the indices corresponding to the target categories in the NYU dataset.
+    """
+    return [config.NYU_LABELS.index(category) for category in config.NYU_TARGET_CATEGORIES]
+
+
 def seed_everything(seed=42):
     os.environ['PYTHONHASHSEED'] = str(seed)
     random.seed(seed)
@@ -645,3 +619,25 @@ def seed_everything(seed=42):
     torch.cuda.manual_seed_all(seed)
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
+
+
+def extract_layers(module: nn.Module):
+    """
+    Takes a nn.Module object and returns a list of all the submodules. Extracts the layers/submodules recursively.
+
+    :rtype: List of all layers in the passed module
+    """
+    from models import resyolov3
+
+    layers = []
+    for name, submodule in module.named_children():
+        # If the submodule has children, recursively process them
+        if isinstance(submodule, resyolov3.ResnetBlock):
+            continue
+        if list(submodule.children()):
+            layers.extend(extract_layers(submodule))
+        else:
+            # Append as [name, submodule] for leaf modules
+            if name != "leaky":
+                layers.append([name, submodule])
+    return layers
