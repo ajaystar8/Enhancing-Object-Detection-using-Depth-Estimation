@@ -50,13 +50,6 @@ ANCHORS = [
     [(0.02, 0.03), (0.04, 0.07), (0.08, 0.06)],
 ]
 
-# # NYU_DATASET_ANCHORS
-# ANCHORS = [
-#     [[0.07, 0.07], [0.1, 0.18], [0.21, 0.11]],
-#     [[0.1, 0.43], [0.21, 0.27], [0.19, 0.63]],
-#     [[0.56, 0.28], [0.35, 0.51], [0.71, 0.55]]
-# ]
-
 scale = 1.1
 
 NYU_LABELS = ['book', 'bottle', 'cabinet', 'ceiling', 'chair', 'cone', 'counter', 'dishwasher', 'faucet',

@@ -81,6 +81,7 @@ def generate_hha(idx):
 
 if __name__ == "__main__":
     root = '../NYUD/'
+    os.makedirs(os.path.join("..", "NYUD", "hha"), exist_ok=True)
 
     total_images_num = len(glob.glob(os.path.join(root, "depth", "*.png")))
 

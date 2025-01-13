@@ -449,21 +449,6 @@ def check_class_accuracy(model, loader, threshold):
     return class_acc, obj_acc, noobj_acc
 
 
-def get_mean_std(loader):
-    # var[X] = E[X**2] - E[X]**2
-    channels_sum, channels_sqrd_sum, num_batches = 0, 0, 0
-
-    for data, _ in tqdm(loader):
-        channels_sum += torch.mean(data, dim=[0, 2, 3])
-        channels_sqrd_sum += torch.mean(data ** 2, dim=[0, 2, 3])
-        num_batches += 1
-
-    mean = channels_sum / num_batches
-    std = (channels_sqrd_sum / num_batches - mean ** 2) ** 0.5
-
-    return mean, std
-
-
 def save_checkpoint(model, learning_rate, optimizer=None, filename="my_checkpoint.pth.tar", save_dir="checkpoints"):
     """
     Saves the model state and optionally the optimizer state to a checkpoint.
@@ -503,39 +488,6 @@ def load_checkpoint(checkpoint_file, model, optimizer=None, device='cpu'):
     print("Checkpoint loaded successfully!")
 
 
-def plot_couple_examples(model, loader, thresh, iou_thresh, anchors):
-    model.eval()
-    x, y = next(iter(loader))
-
-    image, depth = x[:, 0:3, :, :], x[:, 3:, :, :]
-    image = image.to(config.DEVICE)
-    if depth is not None:
-        depth = depth.to(config.DEVICE)
-
-    with torch.no_grad():
-        if isinstance(model, ResYOLOv3):
-            out = model(image, depth)
-        else:
-            out = model(image)
-        bboxes = [[] for _ in range(image.shape[0])]
-        for i in range(3):
-            batch_size, A, S, _, _ = out[i].shape
-            anchor = anchors[i]
-            boxes_scale_i = cells_to_bboxes(
-                out[i], anchor, S=S, is_preds=True
-            )
-            for idx, (box) in enumerate(boxes_scale_i):
-                bboxes[idx] += box
-
-        model.train()
-
-    for i in range(batch_size):
-        nms_boxes = non_max_suppression(
-            bboxes[i], iou_threshold=iou_thresh, threshold=thresh, box_format="midpoint",
-        )
-        plot_image(image[i].permute(1, 2, 0).detach().cpu(), nms_boxes)
-
-
 def generate_train_test_indices(num_samples, train_ratio=0.8):
     """
     Splits indices into training and testing subsets.
@@ -572,7 +524,7 @@ def get_loaders_nyu(mat_file_path, train_mode, train_ratio=0.8):
         test_loader (DataLoader): DataLoader for testing PASCAL.
         train_eval_loader (DataLoader): DataLoader for evaluating training PASCAL.
     """
-    from data.NYUdataset import NYUYoloDataset
+    from data.NYUYoloDataset import NYUYoloDataset
     from utils.transforms import get_train_test_transforms_list
 
     # Load the number of samples in the dataset

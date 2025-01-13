@@ -4,6 +4,7 @@
 
 1. Download the `Labelled Dataset (~2.8GB)` from [NYU Depth Dataset V2](https://cs.nyu.edu/~fergus/datasets/nyu_depth_v2.html). After the download is complete, you would have a `.mat` file. 
 2. Place this file inside the `resources` folder. 
+   3. Execute the `create_dataset.py` file, which is placed inside the `data` folder to get access to the images and depth maps.
 3. To generate the HHA image dataset, run the `Depth2HHA/getHHA.py`. This will place the HHA images inside the `NYUD` directory. 
 
 ## Training the Model
@@ -21,6 +22,8 @@
 
 _Note: Ensure that the checkpoint being loaded (you could change this by updating the path to the checkpoint) is for the
    model you are using to make a prediction. Otherwise, runtime exceptions will be thrown._
+
+_Note: Due to restrictions in file size, we have placed only the model checkpoint for Experiment-1 (YOLOv3). In case you require the checkpoints for other models, please reach out to us. We will be happy to provide it to you._
 
 1. Place the model checkpoints inside the `checkpoints` folder.
 2. To make predictions, simply execute the `show_image.py` file.
